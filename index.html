@@ -14,6 +14,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -26,9 +27,11 @@
         .sync-online { background: #10b981; color: white; }
         .sync-offline { background: #ef4444; color: white; }
         .timer-bar { height: 100%; background: linear-gradient(90deg, #2563eb, #1e40af); transition: width 1s linear; }
-        .quiz-timer { width: 100%; height: 4px; background: #e5e7eb; position: fixed; top: 0; left: 0; z-index: 50; }
         .card-hover { transition: all 0.2s; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+        .upload-area { border: 2px dashed #cbd5e1; transition: all 0.3s; }
+        .upload-area:hover { border-color: #3b82f6; background-color: #eff6ff; }
+        .upload-area.dragover { border-color: #2563eb; background-color: #dbeafe; }
     </style>
 </head>
 <body class="text-gray-800 antialiased">
@@ -126,20 +129,20 @@
             projectId: "educloud-sistema",
             storageBucket: "educloud-sistema.firebasestorage.app",
             messagingSenderId: "279645366191",
-            appId: "1:279645366191:web:df16df577ccc959a4f315a"
+            appId: "1:279645366191:web:df6df577ccc959a4f315a"
         };
 
         // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        const storage = firebase.storage();
 
         const app = {
             currentUser: null,
             currentUserData: null,
             currentView: 'dashboard',
-            timerInterval: null,
-            provaAtual: null,
+            uploadTask: null,
 
             init() {
                 this.renderLogin();
@@ -344,10 +347,6 @@
                     this.showToast('Erro ao salvar: ' + err.message, 'error');
                     throw err;
                 }
-            },
-
-            async updateDocument(collection, id, data) {
-                await db.collection(collection).doc(id).update(data);
             },
 
             async deleteDocument(collection, id) {
@@ -561,7 +560,6 @@
                 const provas = await this.getCollection('provas');
                 const turmas = await this.getCollection('turmas');
                 
-                // Filtrar provas por permissão
                 let provasFiltradas = provas;
                 if (this.currentUserData.tipo === 'professor') {
                     provasFiltradas = provas.filter(p => p.professorId === this.currentUserData.id);
@@ -581,345 +579,4 @@
                     </div>
                     <div class="grid grid-cols-1 gap-4">
                         ${provasFiltradas.map(p => {
-                            const turma = turmas.find(t => t.id === p.turmaId);
-                            return `
-                                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 card-hover">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <h3 class="text-lg font-bold text-gray-900">${p.titulo}</h3>
-                                            <p class="text-sm text-gray-600 mt-1">
-                                                <i class="fas fa-users mr-1"></i> ${turma?.nome || 'Sem turma'} • 
-                                                <i class="fas fa-question-circle mr-1"></i> ${p.questoes?.length || 0} questões
-                                            </p>
-                                        </div>
-                                        <div class="flex gap-2">
-                                            ${this.currentUserData.tipo === 'aluno' ? `
-                                                <button onclick="app.iniciarProva('${p.id}')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                                    Iniciar
-                                                </button>
-                                            ` : `
-                                                <button onclick="app.deleteDocument('provas', '${p.id}')" class="text-red-600 hover:text-red-800 p-2">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            `}
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                    ${provasFiltradas.length === 0 ? '<p class="text-center text-gray-500 mt-8">Nenhuma prova disponível</p>' : ''}
-                `;
-            },
-
-            async renderMateriais(container) {
-                const materiais = await this.getCollection('materiais');
-                const turmas = await this.getCollection('turmas');
-                
-                let mats = materiais;
-                if (this.currentUserData.tipo === 'aluno') {
-                    const turmaAluno = turmas.find(t => t.alunos?.includes(this.currentUserData.id));
-                    mats = materiais.filter(m => m.turmaId === turmaAluno?.id);
-                }
-
-                container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Materiais</h2>
-                        ${this.currentUserData.tipo === 'professor' ? `
-                        <button onclick="app.showModal('material')" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                            <i class="fas fa-upload mr-2"></i>Enviar Material
-                        </button>
-                        ` : ''}
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        ${mats.map(m => `
-                            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 card-hover">
-                                <div class="flex items-center mb-4">
-                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                                        <i class="fas fa-file-alt text-blue-600 text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-bold text-gray-900">${m.titulo}</h3>
-                                        <p class="text-xs text-gray-500">${new Date(m.criado?.toDate()).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
-                                <button onclick="app.showToast('Download simulado', 'info')" class="w-full py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">
-                                    <i class="fas fa-download mr-2"></i>Baixar
-                                </button>
-                            </div>
-                        `).join('')}
-                    </div>
-                    ${mats.length === 0 ? '<p class="text-center text-gray-500 mt-8">Nenhum material disponível</p>' : ''}
-                `;
-            },
-
-            async renderNotas(container) {
-                const users = await this.getCollection('users');
-                const alunos = users.filter(u => u.tipo === 'aluno');
-                const notas = await this.getCollection('notas');
-                const provas = await this.getCollection('provas');
-
-                container.innerHTML = `
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Lançar Notas</h2>
-                        <p class="text-gray-600">Gerenciamento de notas dos alunos</p>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th class="px-6 py-3">Aluno</th>
-                                    <th class="px-6 py-3">Prova</th>
-                                    <th class="px-6 py-3">Nota</th>
-                                    <th class="px-6 py-3 text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y">
-                                ${alunos.map(a => {
-                                    const notaAluno = notas.find(n => n.alunoId === a.id);
-                                    const prova = notaAluno ? provas.find(p => p.id === notaAluno.provaId) : null;
-                                    return `
-                                        <tr class="hover:bg-slate-50">
-                                            <td class="px-6 py-4 font-medium">${a.nome}</td>
-                                            <td class="px-6 py-4">${prova?.titulo || '-'}</td>
-                                            <td class="px-6 py-4 font-bold ${notaAluno?.nota >= 6 ? 'text-green-600' : 'text-red-600'}">${notaAluno?.nota || '-'}</td>
-                                            <td class="px-6 py-4 text-right">
-                                                <button onclick="app.lancarNotaManual('${a.id}')" class="text-blue-600 hover:text-blue-800">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            },
-
-            async renderMinhasNotas(container) {
-                const notas = await this.getCollection('notas');
-                const minhasNotas = notas.filter(n => n.alunoId === this.currentUserData.id);
-                const provas = await this.getCollection('provas');
-                
-                const media = minhasNotas.length ? (minhasNotas.reduce((a, b) => a + (b.nota || 0), 0) / minhasNotas.length).toFixed(1) : 0;
-
-                container.innerHTML = `
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Minhas Notas</h2>
-                        <p class="text-gray-600">Histórico de avaliações</p>
-                    </div>
-                    
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm text-gray-600">Média Geral</p>
-                                <p class="text-4xl font-bold ${media >= 6 ? 'text-blue-600' : 'text-red-600'}">${media}</p>
-                            </div>
-                            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-star text-2xl text-blue-600"></i>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 divide-y">
-                        ${minhasNotas.map(n => {
-                            const prova = provas.find(p => p.id === n.provaId);
-                            return `
-                                <div class="p-6 flex justify-between items-center hover:bg-slate-50">
-                                    <div>
-                                        <h4 class="font-semibold text-gray-900">${prova?.titulo || 'Prova'}</h4>
-                                        <p class="text-sm text-gray-500">${n.criado ? new Date(n.criado.toDate()).toLocaleDateString() : ''}</p>
-                                    </div>
-                                    <span class="text-2xl font-bold ${n.nota >= 6 ? 'text-blue-600' : 'text-red-600'}">${n.nota}</span>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                    ${minhasNotas.length === 0 ? '<p class="p-6 text-center text-gray-500">Nenhuma nota registrada</p>' : ''}
-                `;
-            },
-
-            async renderConfig(container) {
-                container.innerHTML = `
-                    <div class="max-w-2xl mx-auto">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Configurações SENATEDU</h2>
-                        
-                        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-                            <h3 class="font-bold text-lg mb-2">Status do Firebase</h3>
-                            <p class="text-green-600 flex items-center gap-2">
-                                <i class="fas fa-check-circle"></i> Conectado ao projeto
-                            </p>
-                            <p class="text-sm text-gray-600 mt-2">Sincronização ativa em tempo real</p>
-                        </div>
-
-                        <div class="bg-white rounded-xl shadow-sm p-6">
-                            <h3 class="font-bold text-lg text-red-600 mb-3">Aviso</h3>
-                            <p class="text-gray-600 mb-4">Limpar dados afetará todos os usuários do SENATEDU.</p>
-                            <button onclick="app.clearAllData()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                                <i class="fas fa-trash mr-2"></i>Limpar Todos os Dados
-                            </button>
-                        </div>
-                    </div>
-                `;
-            },
-
-            showModal(type) {
-                if (type === 'professor') {
-                    const nome = prompt('Nome do professor:');
-                    const email = prompt('Email do professor:');
-                    const senha = prompt('Senha temporária (mín 6 caracteres):');
-                    
-                    if (nome && email && senha) {
-                        auth.createUserWithEmailAndPassword(email, senha).then(cred => {
-                            return db.collection('users').doc(cred.user.uid).set({
-                                nome, email, tipo: 'professor',
-                                criado: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                        }).then(() => {
-                            this.showToast('Professor criado!', 'success');
-                            this.renderContent();
-                        }).catch(err => alert(err.message));
-                    }
-                } else if (type === 'turma') {
-                    const nome = prompt('Nome da turma (ex: 1º Ano A):');
-                    const serie = prompt('Série:');
-                    const turno = prompt('Turno (Manhã/Tarde/Noite):');
-                    
-                    if (nome) {
-                        this.addDocument('turmas', {
-                            nome, serie, turno,
-                            professorId: this.currentUserData.tipo === 'professor' ? this.currentUser.uid : null,
-                            alunos: []
-                        }).then(() => {
-                            this.showToast('Turma criada!', 'success');
-                            this.renderContent();
-                        });
-                    }
-                } else if (type === 'aluno') {
-                    const nome = prompt('Nome do aluno:');
-                    const email = prompt('Email do aluno:');
-                    const senha = prompt('Senha temporária (mín 6 caracteres):');
-                    
-                    if (nome && email && senha) {
-                        auth.createUserWithEmailAndPassword(email, senha).then(cred => {
-                            return db.collection('users').doc(cred.user.uid).set({
-                                nome, email, tipo: 'aluno',
-                                criado: firebase.firestore.FieldValue.serverTimestamp(),
-                                matricula: Date.now().toString().slice(-6)
-                            });
-                        }).then(() => {
-                            this.showToast('Aluno criado!', 'success');
-                            this.renderContent();
-                        }).catch(err => alert(err.message));
-                    }
-                } else if (type === 'prova') {
-                    const titulo = prompt('Título da prova:');
-                    if (titulo) {
-                        this.addDocument('provas', {
-                            titulo,
-                            professorId: this.currentUserData.id,
-                            questoes: [],
-                            ativa: false,
-                            criado: firebase.firestore.FieldValue.serverTimestamp()
-                        }).then(() => {
-                            this.showToast('Prova criada! Adicione questões depois.', 'success');
-                            this.renderContent();
-                        });
-                    }
-                } else if (type === 'material') {
-                    const titulo = prompt('Título do material:');
-                    if (titulo) {
-                        this.addDocument('materiais', {
-                            titulo,
-                            professorId: this.currentUserData.id,
-                            tipo: 'pdf',
-                            criado: firebase.firestore.FieldValue.serverTimestamp()
-                        }).then(() => {
-                            this.showToast('Material adicionado!', 'success');
-                            this.renderContent();
-                        });
-                    }
-                }
-            },
-
-            iniciarProva(provaId) {
-                this.showToast('Sistema de provas em desenvolvimento', 'info');
-            },
-
-            lancarNotaManual(alunoId) {
-                const nota = prompt('Digite a nota (0-10):');
-                if (nota && !isNaN(nota)) {
-                    this.addDocument('notas', {
-                        alunoId,
-                        nota: parseFloat(nota),
-                        professorId: this.currentUserData.id,
-                        criado: firebase.firestore.FieldValue.serverTimestamp()
-                    }).then(() => {
-                        this.showToast('Nota lançada!', 'success');
-                        this.renderContent();
-                    });
-                }
-            },
-
-            showQRCode(turmaId) {
-                const div = document.createElement('div');
-                div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
-                div.innerHTML = `
-                    <div class="bg-white rounded-xl p-8 text-center max-w-sm w-full">
-                        <h3 class="text-xl font-bold mb-4 text-blue-800">QR Code SENATEDU</h3>
-                        <div id="qrcode" class="flex justify-center mb-4"></div>
-                        <p class="text-sm text-gray-600 mb-4">Escaneie para matricular-se</p>
-                        <button onclick="this.closest('.fixed').remove()" class="w-full py-2 bg-slate-200 rounded-lg hover:bg-slate-300">Fechar</button>
-                    </div>
-                `;
-                document.body.appendChild(div);
-                new QRCode(document.getElementById('qrcode'), {
-                    text: `https://juliobitaraes.github.io/senatedu/matricula?turma=${turmaId}`,
-                    width: 200,
-                    height: 200,
-                    colorDark: '#1e40af',
-                    colorLight: '#ffffff'
-                });
-            },
-
-            viewTurma(id) {
-                alert('Detalhes da turma ' + id);
-            },
-
-            async clearAllData() {
-                if (!confirm('ATENÇÃO: Isso apagará TODOS os dados permanentemente!\n\nTem certeza?')) return;
-                
-                const collections = ['users', 'turmas', 'provas', 'notas', 'materiais'];
-                try {
-                    for (const col of collections) {
-                        const snapshot = await db.collection(col).get();
-                        const batch = db.batch();
-                        snapshot.docs.forEach(doc => batch.delete(doc.ref));
-                        await batch.commit();
-                    }
-                    this.showToast('Todos os dados foram apagados', 'success');
-                    this.renderContent();
-                } catch (err) {
-                    alert('Erro ao limpar dados: ' + err.message);
-                }
-            },
-
-            showToast(message, type = 'info') {
-                const container = document.getElementById('toast-container');
-                const toast = document.createElement('div');
-                const colors = { success: 'bg-blue-600', error: 'bg-red-500', info: 'bg-blue-800' };
-                
-                toast.className = `${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg mb-2 fade-in`;
-                toast.textContent = message;
-                container.appendChild(toast);
-                setTimeout(() => toast.remove(), 3000);
-            }
-        };
-
-        document.addEventListener('DOMContentLoaded', () => {
-            app.init();
-        });
-    </script>
-</body>
-</html>
+                            const turma = turmas.find
