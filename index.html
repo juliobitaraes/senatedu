@@ -3,96 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduCloud - Sistema de Gestão Escolar</title>
-    
-    <!-- Tailwind CSS -->
+    <title>EduCloud Pro - Sistema com Firebase</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- SheetJS (Excel) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
-    <!-- QRCode.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    
-    <!-- jsPDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        
-        .glass-effect {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-        }
-        
-        .sidebar-transition { transition: all 0.3s ease-in-out; }
-        
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .slide-in { animation: slideIn 0.3s ease-out; }
-        @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-        
-        .quiz-timer { 
-            width: 100%; height: 4px; background: #e5e7eb; 
-            position: fixed; top: 0; left: 0; z-index: 50;
-        }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .sync-status { position: fixed; bottom: 20px; right: 20px; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 100; }
+        .sync-online { background: #10b981; color: white; }
+        .sync-offline { background: #ef4444; color: white; }
         .timer-bar { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 1s linear; }
-        
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #555; }
-        
-        .card-hover { transition: all 0.2s; }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
-        
-        .notification-badge {
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-        
-        @media (max-width: 768px) {
-            .mobile-hidden { display: none; }
-            .mobile-full { width: 100% !important; }
-        }
+        .quiz-timer { width: 100%; height: 4px; background: #e5e7eb; position: fixed; top: 0; left: 0; z-index: 50; }
     </style>
 </head>
 <body class="text-gray-800 antialiased">
 
-    <!-- Sistema de Notificações Toast -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
-
-    <!-- Barra de Timer (visível apenas durante provas) -->
-    <div id="quiz-timer-container" class="hidden">
-        <div class="quiz-timer">
-            <div id="timer-bar" class="timer-bar" style="width: 100%"></div>
-        </div>
-        <div class="fixed top-6 right-4 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-200 z-40">
-            <span class="text-sm font-semibold text-gray-700">
-                <i class="fas fa-clock text-blue-500 mr-2"></i>
-                Tempo: <span id="timer-display">00:00</span>
-            </span>
-        </div>
+    <div id="sync-indicator" class="sync-status sync-online hidden">
+        <i class="fas fa-cloud"></i> <span id="sync-text">Online</span>
     </div>
 
-    <!-- Container Principal -->
-    <div id="app">
-        <!-- Conteúdo dinâmico será injetado aqui -->
-    </div>
+    <div id="app"></div>
 
-    <!-- Template: Login -->
+    <!-- Template: Login Firebase -->
     <template id="login-template">
         <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 p-4">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 fade-in">
@@ -100,82 +46,39 @@
                     <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-4">
                         <i class="fas fa-graduation-cap text-3xl text-white"></i>
                     </div>
-                    <h1 class="text-3xl font-bold text-gray-900">EduCloud</h1>
-                    <p class="text-gray-500">Sistema de Gestão Escolar</p>
+                    <h1 class="text-3xl font-bold text-gray-900">EduCloud Pro</h1>
+                    <p class="text-gray-500">Sistema em Nuvem com Firebase</p>
                 </div>
+                
+                <div id="login-error" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
                 
                 <form id="login-form" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <div class="relative">
-                            <i class="fas fa-envelope absolute left-3 top-3 text-gray-400"></i>
-                            <input type="email" id="login-email" required 
-                                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="professor@escola.com ou aluno@escola.com">
-                        </div>
+                        <input type="email" id="login-email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="email@exemplo.com">
                     </div>
-                    
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                        <div class="relative">
-                            <i class="fas fa-lock absolute left-3 top-3 text-gray-400"></i>
-                            <input type="password" id="login-password" required 
-                                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="••••••••">
-                        </div>
+                        <input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••">
                     </div>
-
-                    <div class="flex items-center justify-between text-sm">
-                        <label class="flex items-center">
-                            <input type="checkbox" class="rounded text-blue-600 focus:ring-blue-500">
-                            <span class="ml-2 text-gray-600">Lembrar-me</span>
-                        </label>
-                        <a href="#" class="text-blue-600 hover:underline">Esqueci a senha</a>
-                    </div>
-
-                    <button type="submit" 
-                        class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition duration-200">
-                        Entrar no Sistema
+                    <button type="submit" id="login-btn" class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
+                        <span id="btn-text">Entrar</span>
                     </button>
                 </form>
 
-                <div class="relative">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-300"></div>
-                    </div>
-                    <div class="relative flex justify-center text-sm">
-                        <span class="px-2 bg-white text-gray-500">Acesso rápido de demonstração</span>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-3 gap-2 text-xs">
-                    <button onclick="app.quickLogin('admin')" class="p-2 border rounded-lg hover:bg-gray-50 transition">
-                        <i class="fas fa-user-shield text-blue-600 mb-1 block"></i>
-                        Admin
-                    </button>
-                    <button onclick="app.quickLogin('professor')" class="p-2 border rounded-lg hover:bg-gray-50 transition">
-                        <i class="fas fa-chalkboard-teacher text-purple-600 mb-1 block"></i>
-                        Professor
-                    </button>
-                    <button onclick="app.quickLogin('aluno')" class="p-2 border rounded-lg hover:bg-gray-50 transition">
-                        <i class="fas fa-user-graduate text-pink-600 mb-1 block"></i>
-                        Aluno
+                <div class="space-y-2 text-center text-sm">
+                    <p class="text-gray-500">Primeiro acesso?</p>
+                    <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">
+                        Criar conta de Administrador
                     </button>
                 </div>
-                
-                <p class="text-xs text-center text-gray-400 mt-4">
-                    Credenciais demo: admin@edu.com / professor@edu.com / aluno@edu.com<br>
-                    Senha: 123456
-                </p>
             </div>
         </div>
     </template>
 
-    <!-- Template: Layout Principal -->
     <template id="main-layout">
         <div class="min-h-screen flex flex-col md:flex-row">
-            <!-- Sidebar -->
-            <aside id="sidebar" class="bg-gray-900 text-white w-full md:w-64 flex-shrink-0 sidebar-transition md:fixed md:h-screen overflow-y-auto custom-scrollbar z-30">
+            <aside id="sidebar" class="bg-gray-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block">
                 <div class="p-6 border-b border-gray-800">
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -183,254 +86,220 @@
                         </div>
                         <div>
                             <h1 class="text-xl font-bold">EduCloud</h1>
-                            <p class="text-xs text-gray-400" id="user-role-display">Carregando...</p>
+                            <p class="text-xs text-gray-400" id="user-role">...</p>
                         </div>
                     </div>
                 </div>
-
-                <nav class="p-4 space-y-2" id="sidebar-nav">
-                    <!-- Menu items serão injetados via JS -->
-                </nav>
-
+                <nav class="p-4 space-y-2" id="sidebar-nav"></nav>
                 <div class="absolute bottom-0 w-full p-4 border-t border-gray-800 bg-gray-900">
                     <div class="flex items-center space-x-3 mb-3">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-sm font-bold" id="user-avatar">
-                            U
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-sm font-bold" id="user-avatar">U</div>
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium truncate" id="user-name">Usuário</p>
-                            <p class="text-xs text-gray-400 truncate" id="user-email">email@exemplo.com</p>
+                            <p class="text-sm font-medium truncate" id="user-name">...</p>
+                            <p class="text-xs text-gray-400 truncate" id="user-email">...</p>
                         </div>
                     </div>
                     <button onclick="app.logout()" class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition text-sm">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>Sair</span>
+                        <i class="fas fa-sign-out-alt"></i> <span>Sair</span>
                     </button>
                 </div>
             </aside>
 
-            <!-- Overlay mobile -->
-            <div id="mobile-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden" onclick="app.toggleSidebar()"></div>
-
-            <!-- Main Content -->
             <main class="flex-1 md:ml-64 min-h-screen">
-                <!-- Header Mobile -->
                 <div class="md:hidden bg-white shadow-sm p-4 flex items-center justify-between sticky top-0 z-10">
-                    <button onclick="app.toggleSidebar()" class="text-gray-600 hover:text-gray-900">
-                        <i class="fas fa-bars text-xl"></i>
-                    </button>
-                    <span class="font-semibold text-gray-800">EduCloud</span>
+                    <button onclick="app.toggleSidebar()" class="text-gray-600"><i class="fas fa-bars text-xl"></i></button>
+                    <span class="font-semibold">EduCloud</span>
                     <div class="w-8"></div>
                 </div>
-
-                <!-- Content Area -->
-                <div id="content-area" class="p-4 md:p-8 fade-in">
-                    <!-- Conteúdo dinâmico -->
-                </div>
+                <div id="content-area" class="p-4 md:p-8 fade-in"></div>
             </main>
         </div>
     </template>
 
-    <!-- Componente: Card de Estatística -->
-    <template id="stat-card">
-        <div class="bg-white rounded-xl shadow-sm p-6 card-hover border border-gray-100">
-            <div class="flex items-center justify-between mb-4">
-                <div class="p-3 rounded-lg bg-opacity-20" id="stat-icon-bg">
-                    <i class="text-xl" id="stat-icon"></i>
-                </div>
-                <span class="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                    <i class="fas fa-arrow-up mr-1"></i><span id="stat-change">0%</span>
-                </span>
-            </div>
-            <h3 class="text-gray-500 text-sm font-medium" id="stat-label">Label</h3>
-            <p class="text-2xl font-bold text-gray-900 mt-1" id="stat-value">0</p>
-        </div>
-    </template>
-
     <script>
-        // ==================== SISTEMA PRINCIPAL ====================
+        // ==================== SUAS CREDENCIAIS FIREBASE ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyChnKOxAQH9RqSYmvcf3zYmajg3p5LCogc",
+            authDomain: "educloud-sistema.firebaseapp.com",
+            projectId: "educloud-sistema",
+            storageBucket: "educloud-sistema.firebasestorage.app",
+            messagingSenderId: "279645366191",
+            appId: "1:279645366191:web:df16df577ccc959a4f315a"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
         const app = {
             currentUser: null,
+            currentUserData: null,
             currentView: 'dashboard',
-            db: {
-                users: [],
-                turmas: [],
-                alunos: [],
-                materiais: [],
-                provas: [],
-                notas: [],
-                notificacoes: []
-            },
             timerInterval: null,
 
             init() {
-                this.loadData();
-                this.initializeDemoData();
                 this.renderLogin();
+                this.monitorAuth();
+                this.monitorConnection();
             },
 
-            initializeDemoData() {
-                if (this.db.users.length === 0) {
-                    // Usuários padrão
-                    this.db.users = [
-                        { id: 1, nome: 'Administrador', email: 'admin@edu.com', senha: '123456', tipo: 'admin', criado: new Date() },
-                        { id: 2, nome: 'Prof. Santos', email: 'professor@edu.com', senha: '123456', tipo: 'professor', criado: new Date() },
-                        { id: 3, nome: 'Aluno Silva', email: 'aluno@edu.com', senha: '123456', tipo: 'aluno', matricula: '2024001', turmaId: 1, criado: new Date() }
-                    ];
-
-                    // Turmas
-                    this.db.turmas = [
-                        { id: 1, nome: '1º Ano A', serie: '1º Ano', turno: 'Manhã', professorId: 2, alunos: [3] },
-                        { id: 2, nome: '2º Ano B', serie: '2º Ano', turno: 'Tarde', professorId: 2, alunos: [] }
-                    ];
-
-                    // Materiais
-                    this.db.materiais = [
-                        { id: 1, titulo: 'Apostila de Matemática', tipo: 'pdf', turmaId: 1, professorId: 2, data: new Date(), url: '#' },
-                        { id: 2, titulo: 'Lista de Exercícios', tipo: 'doc', turmaId: 1, professorId: 2, data: new Date(), url: '#' }
-                    ];
-
-                    // Provas
-                    this.db.provas = [
-                        { 
-                            id: 1, 
-                            titulo: 'Prova de Matemática - 1º Bimestre', 
-                            turmaId: 1, 
-                            professorId: 2,
-                            questoes: [
-                                { id: 1, tipo: 'multipla_escolha', pergunta: 'Quanto é 2 + 2?', opcoes: ['3', '4', '5', '6'], correta: 1, tempo: 30 },
-                                { id: 2, tipo: 'multipla_escolha', pergunta: 'Qual a raiz quadrada de 16?', opcoes: ['2', '4', '6', '8'], correta: 1, tempo: 60 }
-                            ],
-                            tempoTotal: 90,
-                            ativa: true
+            monitorAuth() {
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        // Buscar dados adicionais do usuário no Firestore
+                        const doc = await db.collection('users').doc(user.uid).get();
+                        if (doc.exists) {
+                            this.currentUser = user;
+                            this.currentUserData = { id: user.uid, ...doc.data() };
+                            this.renderMainLayout();
+                        } else {
+                            auth.signOut();
+                            alert('Usuário autenticado mas sem perfil completo no sistema');
                         }
-                    ];
-
-                    this.saveData();
-                }
-            },
-
-            loadData() {
-                const data = localStorage.getItem('educloud_data');
-                if (data) {
-                    this.db = JSON.parse(data);
-                }
-            },
-
-            saveData() {
-                localStorage.setItem('educloud_data', JSON.stringify(this.db));
-            },
-
-            // ==================== AUTENTICAÇÃO ====================
-            renderLogin() {
-                const app = document.getElementById('app');
-                const template = document.getElementById('login-template');
-                app.innerHTML = template.innerHTML;
-
-                document.getElementById('login-form').addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    this.login(
-                        document.getElementById('login-email').value,
-                        document.getElementById('login-password').value
-                    );
+                    } else {
+                        this.currentUser = null;
+                        this.currentUserData = null;
+                        this.renderLogin();
+                    }
                 });
             },
 
-            quickLogin(type) {
-                const emails = {
-                    admin: 'admin@edu.com',
-                    professor: 'professor@edu.com',
-                    aluno: 'aluno@edu.com'
-                };
-                document.getElementById('login-email').value = emails[type];
-                document.getElementById('login-password').value = '123456';
-                this.login(emails[type], '123456');
+            monitorConnection() {
+                const indicator = document.getElementById('sync-indicator');
+                const text = document.getElementById('sync-text');
+                
+                window.addEventListener('online', () => {
+                    indicator.className = 'sync-status sync-online';
+                    text.textContent = 'Online - Sincronizado';
+                    indicator.classList.remove('hidden');
+                    setTimeout(() => indicator.classList.add('hidden'), 3000);
+                });
+                
+                window.addEventListener('offline', () => {
+                    indicator.className = 'sync-status sync-offline';
+                    text.textContent = 'Offline - Dados locais';
+                    indicator.classList.remove('hidden');
+                });
             },
 
-            login(email, senha) {
-                const user = this.db.users.find(u => u.email === email && u.senha === senha);
-                if (user) {
-                    this.currentUser = user;
-                    this.showToast(`Bem-vindo, ${user.nome}!`, 'success');
-                    this.renderMainLayout();
-                } else {
-                    this.showToast('Credenciais inválidas!', 'error');
+            renderLogin() {
+                document.getElementById('app').innerHTML = document.getElementById('login-template').innerHTML;
+                
+                document.getElementById('login-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('login-email').value;
+                    const password = document.getElementById('login-password').value;
+                    const btn = document.getElementById('login-btn');
+                    const btnText = document.getElementById('btn-text');
+                    const error = document.getElementById('login-error');
+                    
+                    btn.disabled = true;
+                    btnText.innerHTML = '<div class="loading"></div>';
+                    
+                    try {
+                        await auth.signInWithEmailAndPassword(email, password);
+                    } catch (err) {
+                        error.textContent = this.getAuthError(err.code);
+                        error.classList.remove('hidden');
+                        btn.disabled = false;
+                        btnText.textContent = 'Entrar';
+                    }
+                });
+            },
+
+            getAuthError(code) {
+                const errors = {
+                    'auth/user-not-found': 'Usuário não encontrado. Verifique o email.',
+                    'auth/wrong-password': 'Senha incorreta.',
+                    'auth/invalid-email': 'Email inválido.',
+                    'auth/too-many-requests': 'Muitas tentativas. Tente mais tarde.',
+                    'auth/invalid-credential': 'Email ou senha incorretos.'
+                };
+                return errors[code] || 'Erro ao autenticar. Tente novamente.';
+            },
+
+            async setupFirstAdmin() {
+                const nome = prompt('Digite seu nome completo:');
+                const email = prompt('Digite seu email (será o login):');
+                const senha = prompt('Crie uma senha (mínimo 6 caracteres):');
+                
+                if (!nome || !email || !senha) {
+                    alert('Preencha todos os campos');
+                    return;
+                }
+                
+                if (senha.length < 6) {
+                    alert('A senha deve ter pelo menos 6 caracteres');
+                    return;
+                }
+                
+                try {
+                    // Criar usuário na autenticação
+                    const userCred = await auth.createUserWithEmailAndPassword(email, senha);
+                    
+                    // Salvar dados no Firestore
+                    await db.collection('users').doc(userCred.user.uid).set({
+                        nome: nome,
+                        email: email,
+                        tipo: 'admin',
+                        criado: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    alert('Administrador criado com sucesso! Você será conectado automaticamente.');
+                } catch (err) {
+                    alert('Erro ao criar admin: ' + err.message);
                 }
             },
 
             logout() {
-                this.currentUser = null;
-                this.currentView = 'dashboard';
-                this.showToast('Sessão encerrada', 'info');
-                this.renderLogin();
+                auth.signOut();
             },
 
-            // ==================== LAYOUT ====================
             renderMainLayout() {
-                const appContainer = document.getElementById('app');
-                const template = document.getElementById('main-layout');
-                appContainer.innerHTML = template.innerHTML;
-
-                this.updateUserInfo();
+                const appDiv = document.getElementById('app');
+                appDiv.innerHTML = document.getElementById('main-layout').innerHTML;
+                
+                document.getElementById('user-name').textContent = this.currentUserData.nome;
+                document.getElementById('user-email').textContent = this.currentUserData.email;
+                document.getElementById('user-avatar').textContent = this.currentUserData.nome.charAt(0).toUpperCase();
+                
+                const roles = { admin: 'Administrador', professor: 'Professor', aluno: 'Aluno' };
+                document.getElementById('user-role').textContent = roles[this.currentUserData.tipo] || 'Usuário';
+                
                 this.renderSidebar();
                 this.renderContent();
             },
 
-            updateUserInfo() {
-                if (!this.currentUser) return;
-                
-                document.getElementById('user-name').textContent = this.currentUser.nome;
-                document.getElementById('user-email').textContent = this.currentUser.email;
-                document.getElementById('user-avatar').textContent = this.currentUser.nome.charAt(0).toUpperCase();
-                
-                const roles = {
-                    admin: 'Administrador',
-                    professor: 'Professor',
-                    aluno: 'Aluno'
-                };
-                document.getElementById('user-role-display').textContent = roles[this.currentUser.tipo];
-            },
-
-            toggleSidebar() {
-                const sidebar = document.getElementById('sidebar');
-                const overlay = document.getElementById('mobile-overlay');
-                
-                if (sidebar.classList.contains('-translate-x-full')) {
-                    sidebar.classList.remove('-translate-x-full');
-                    overlay.classList.remove('hidden');
-                } else {
-                    sidebar.classList.add('-translate-x-full');
-                    overlay.classList.add('hidden');
-                }
-            },
-
             renderSidebar() {
                 const nav = document.getElementById('sidebar-nav');
+                const type = this.currentUserData.tipo;
+                
                 const menus = {
                     admin: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
                         { id: 'professores', icon: 'fa-chalkboard-teacher', label: 'Professores' },
-                        { id: 'turmas', icon: 'fa-users-class', label: 'Turmas' },
+                        { id: 'turmas', icon: 'fa-users', label: 'Turmas' },
+                        { id: 'alunos', icon: 'fa-user-graduate', label: 'Todos Alunos' },
                         { id: 'config', icon: 'fa-cog', label: 'Configurações' }
                     ],
                     professor: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
                         { id: 'turmas', icon: 'fa-users', label: 'Minhas Turmas' },
-                        { id: 'alunos', icon: 'fa-user-graduate', label: 'Alunos' },
+                        { id: 'alunos', icon: 'fa-user-graduate', label: 'Meus Alunos' },
                         { id: 'provas', icon: 'fa-file-alt', label: 'Provas' },
                         { id: 'materiais', icon: 'fa-book', label: 'Materiais' },
                         { id: 'notas', icon: 'fa-star', label: 'Lançar Notas' }
                     ],
                     aluno: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
-                        { id: 'minhas-turmas', icon: 'fa-users', label: 'Minha Turma' },
                         { id: 'provas', icon: 'fa-file-alt', label: 'Provas' },
                         { id: 'materiais', icon: 'fa-book', label: 'Materiais' },
                         { id: 'minhas-notas', icon: 'fa-star', label: 'Minhas Notas' }
                     ]
                 };
 
-                const items = menus[this.currentUser.tipo] || [];
+                const items = menus[type] || [];
                 nav.innerHTML = items.map(item => `
                     <button onclick="app.navigate('${item.id}')" 
                         class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition ${this.currentView === item.id ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}">
@@ -438,6 +307,11 @@
                         <span>${item.label}</span>
                     </button>
                 `).join('');
+            },
+
+            toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('hidden');
             },
 
             navigate(view) {
@@ -449,798 +323,196 @@
                 }
             },
 
-            // ==================== RENDERIZAÇÃO DE VIEWS ====================
-            renderContent() {
+            // ==================== FIRESTORE CRUD ====================
+            async getCollection(collection) {
+                try {
+                    const snapshot = await db.collection(collection).get();
+                    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                } catch (err) {
+                    console.error('Erro ao buscar:', err);
+                    return [];
+                }
+            },
+
+            async addDocument(collection, data) {
+                try {
+                    const docRef = await db.collection(collection).add({
+                        ...data,
+                        criado: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    return docRef.id;
+                } catch (err) {
+                    this.showToast('Erro ao salvar: ' + err.message, 'error');
+                    throw err;
+                }
+            },
+
+            async updateDocument(collection, id, data) {
+                await db.collection(collection).doc(id).update(data);
+            },
+
+            async deleteDocument(collection, id) {
+                if (!confirm('Tem certeza que deseja excluir?')) return;
+                try {
+                    await db.collection(collection).doc(id).delete();
+                    this.showToast('Excluído com sucesso!', 'success');
+                    this.renderContent();
+                } catch (err) {
+                    this.showToast('Erro ao excluir', 'error');
+                }
+            },
+
+            // ==================== RENDERIZAÇÃO ====================
+            async renderContent() {
                 const content = document.getElementById('content-area');
+                content.innerHTML = '<div class="flex justify-center p-8"><div class="loading border-blue-600 border-t-transparent"></div></div>';
                 
-                switch(this.currentView) {
-                    case 'dashboard':
-                        this.renderDashboard(content);
-                        break;
-                    case 'professores':
-                        this.renderProfessores(content);
-                        break;
-                    case 'turmas':
-                    case 'minhas-turmas':
-                        this.renderTurmas(content);
-                        break;
-                    case 'alunos':
-                        this.renderAlunos(content);
-                        break;
-                    case 'provas':
-                        this.renderProvas(content);
-                        break;
-                    case 'materiais':
-                        this.renderMateriais(content);
-                        break;
-                    case 'notas':
-                        this.renderLancarNotas(content);
-                        break;
-                    case 'minhas-notas':
-                        this.renderMinhasNotas(content);
-                        break;
-                    case 'config':
-                        this.renderConfig(content);
-                        break;
-                    default:
-                        this.renderDashboard(content);
-                }
-            },
-
-            // ==================== DASHBOARD ====================
-            renderDashboard(container) {
-                let stats = [];
-                
-                if (this.currentUser.tipo === 'admin') {
-                    stats = [
-                        { label: 'Total de Professores', value: this.db.users.filter(u => u.tipo === 'professor').length, icon: 'fa-chalkboard-teacher', color: 'blue' },
-                        { label: 'Total de Alunos', value: this.db.users.filter(u => u.tipo === 'aluno').length, icon: 'fa-user-graduate', color: 'green' },
-                        { label: 'Turmas', value: this.db.turmas.length, icon: 'fa-users', color: 'purple' },
-                        { label: 'Provas Ativas', value: this.db.provas.filter(p => p.ativa).length, icon: 'fa-file-alt', color: 'orange' }
-                    ];
-                } else if (this.currentUser.tipo === 'professor') {
-                    const minhasTurmas = this.db.turmas.filter(t => t.professorId === this.currentUser.id);
-                    const meusAlunos = minhasTurmas.reduce((acc, t) => acc + (t.alunos?.length || 0), 0);
-                    stats = [
-                        { label: 'Minhas Turmas', value: minhasTurmas.length, icon: 'fa-users', color: 'blue' },
-                        { label: 'Meus Alunos', value: meusAlunos, icon: 'fa-user-graduate', color: 'green' },
-                        { label: 'Provas Criadas', value: this.db.provas.filter(p => p.professorId === this.currentUser.id).length, icon: 'fa-file-alt', color: 'purple' },
-                        { label: 'Materiais', value: this.db.materiais.filter(m => m.professorId === this.currentUser.id).length, icon: 'fa-book', color: 'orange' }
-                    ];
-                } else {
-                    const notas = this.db.notas.filter(n => n.alunoId === this.currentUser.id);
-                    const media = notas.length ? (notas.reduce((a, b) => a + b.nota, 0) / notas.length).toFixed(1) : 0;
-                    stats = [
-                        { label: 'Minha Turma', value: this.db.turmas.find(t => t.id === this.currentUser.turmaId)?.nome || '-', icon: 'fa-users', color: 'blue' },
-                        { label: 'Provas Pendentes', value: this.getProvasPendentes().length, icon: 'fa-file-alt', color: 'red' },
-                        { label: 'Média Geral', value: media, icon: 'fa-star', color: 'purple' },
-                        { label: 'Materiais', value: this.db.materiais.filter(m => m.turmaId === this.currentUser.turmaId).length, icon: 'fa-book', color: 'green' }
-                    ];
-                }
-
-                container.innerHTML = `
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
-                        <p class="text-gray-600">Visão geral do sistema</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                        ${stats.map((stat, idx) => this.createStatCard(stat, idx)).join('')}
-                    </div>
-
-                    ${this.currentUser.tipo !== 'admin' ? `
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                            <h3 class="text-lg font-bold text-gray-800 mb-4">
-                                <i class="fas fa-bell text-yellow-500 mr-2"></i>Notificações Recentes
-                            </h3>
-                            <div class="space-y-3">
-                                ${this.renderNotificacoesList()}
-                            </div>
-                        </div>
-                        
-                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                            <h3 class="text-lg font-bold text-gray-800 mb-4">
-                                <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>Próximas Atividades
-                            </h3>
-                            <div class="space-y-3">
-                                ${this.renderProximasAtividades()}
-                            </div>
-                        </div>
-                    </div>
-                    ` : `
-                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                        <h3 class="text-lg font-bold text-gray-800 mb-4">Atividades Recentes do Sistema</h3>
-                        <canvas id="activityChart" height="100"></canvas>
-                    </div>
-                    `}
-                `;
-
-                if (this.currentUser.tipo === 'admin') {
-                    this.renderActivityChart();
-                }
-            },
-
-            createStatCard(stat, idx) {
-                const colors = {
-                    blue: 'bg-blue-100 text-blue-600',
-                    green: 'bg-green-100 text-green-600',
-                    purple: 'bg-purple-100 text-purple-600',
-                    orange: 'bg-orange-100 text-orange-600',
-                    red: 'bg-red-100 text-red-600'
-                };
-                
-                return `
-                    <div class="bg-white rounded-xl shadow-sm p-6 card-hover border border-gray-100 fade-in" style="animation-delay: ${idx * 0.1}s">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="p-3 rounded-lg ${colors[stat.color]}">
-                                <i class="fas ${stat.icon} text-xl"></i>
-                            </div>
-                        </div>
-                        <h3 class="text-gray-500 text-sm font-medium">${stat.label}</h3>
-                        <p class="text-2xl font-bold text-gray-900 mt-1">${stat.value}</p>
-                    </div>
-                `;
-            },
-
-            getProvasPendentes() {
-                if (this.currentUser.tipo !== 'aluno') return [];
-                const turmaId = this.currentUser.turmaId;
-                const provasTurma = this.db.provas.filter(p => p.turmaId === turmaId && p.ativa);
-                const realizadas = this.db.notas.filter(n => n.alunoId === this.currentUser.id).map(n => n.provaId);
-                return provasTurma.filter(p => !realizadas.includes(p.id));
-            },
-
-            renderNotificacoesList() {
-                const notifs = this.db.notificacoes
-                    .filter(n => n.userId === this.currentUser.id || n.todos)
-                    .slice(-5)
-                    .reverse();
-                
-                if (notifs.length === 0) {
-                    return '<p class="text-gray-400 text-sm italic">Nenhuma notificação</p>';
-                }
-
-                return notifs.map(n => `
-                    <div class="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                        <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                        <div>
-                            <p class="text-sm text-gray-800">${n.mensagem}</p>
-                            <p class="text-xs text-gray-500 mt-1">${new Date(n.data).toLocaleString()}</p>
-                        </div>
-                    </div>
-                `).join('');
-            },
-
-            renderProximasAtividades() {
-                const provas = this.getProvasPendentes();
-                if (provas.length === 0) {
-                    return '<p class="text-gray-400 text-sm italic">Nenhuma atividade pendente</p>';
-                }
-                return provas.map(p => `
-                    <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <div>
-                            <p class="font-semibold text-gray-800 text-sm">${p.titulo}</p>
-                            <p class="text-xs text-gray-600">${p.questoes.length} questões</p>
-                        </div>
-                        <button onclick="app.iniciarProva(${p.id})" class="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700">
-                            Iniciar
-                        </button>
-                    </div>
-                `).join('');
-            },
-
-            renderActivityChart() {
-                const ctx = document.getElementById('activityChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-                        datasets: [{
-                            label: 'Acessos',
-                            data: [65, 78, 90, 85, 95, 110],
-                            borderColor: 'rgb(59, 130, 246)',
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false
+                try {
+                    switch(this.currentView) {
+                        case 'dashboard': await this.renderDashboard(content); break;
+                        case 'professores': await this.renderProfessores(content); break;
+                        case 'turmas': await this.renderTurmas(content); break;
+                        case 'alunos': await this.renderAlunos(content); break;
+                        case 'provas': await this.renderProvas(content); break;
+                        case 'materiais': await this.renderMateriais(content); break;
+                        case 'notas': await this.renderNotas(content); break;
+                        case 'minhas-notas': await this.renderMinhasNotas(content); break;
+                        case 'config': await this.renderConfig(content); break;
+                        default: await this.renderDashboard(content);
                     }
-                });
+                } catch (err) {
+                    content.innerHTML = `<div class="text-red-600 text-center p-4">Erro ao carregar: ${err.message}</div>`;
+                    console.error(err);
+                }
             },
 
-            // ==================== PROFESSORES (ADMIN) ====================
-            renderProfessores(container) {
-                const professores = this.db.users.filter(u => u.tipo === 'professor');
-                
-                container.innerHTML = `
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-800">Gerenciar Professores</h2>
-                            <p class="text-gray-600">Cadastre e gerencie os professores da instituição</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="app.exportToExcel('professores')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
-                                <i class="fas fa-file-excel"></i> Exportar
-                            </button>
-                            <button onclick="app.showModal('professor')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                                <i class="fas fa-plus"></i> Novo Professor
-                            </button>
-                        </div>
-                    </div>
+            async renderDashboard(container) {
+                try {
+                    const totalProf = (await db.collection('users').where('tipo', '==', 'professor').get()).size;
+                    const totalAlunos = (await db.collection('users').where('tipo', '==', 'aluno').get()).size;
+                    const totalTurmas = (await db.collection('turmas').get()).size;
+                    const totalProvas = (await db.collection('provas').get()).size;
 
+                    container.innerHTML = `
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
+                            <p class="text-gray-600">Dados sincronizados em tempo real</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-chalkboard-teacher text-xl"></i></div>
+                                </div>
+                                <h3 class="text-gray-500 text-sm font-medium">Professores</h3>
+                                <p class="text-2xl font-bold text-gray-900 mt-1">${totalProf}</p>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="p-3 rounded-lg bg-green-100 text-green-600"><i class="fas fa-user-graduate text-xl"></i></div>
+                                </div>
+                                <h3 class="text-gray-500 text-sm font-medium">Alunos</h3>
+                                <p class="text-2xl font-bold text-gray-900 mt-1">${totalAlunos}</p>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="p-3 rounded-lg bg-purple-100 text-purple-600"><i class="fas fa-users text-xl"></i></div>
+                                </div>
+                                <h3 class="text-gray-500 text-sm font-medium">Turmas</h3>
+                                <p class="text-2xl font-bold text-gray-900 mt-1">${totalTurmas}</p>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="p-3 rounded-lg bg-orange-100 text-orange-600"><i class="fas fa-file-alt text-xl"></i></div>
+                                </div>
+                                <h3 class="text-gray-500 text-sm font-medium">Provas</h3>
+                                <p class="text-2xl font-bold text-gray-900 mt-1">${totalProvas}</p>
+                            </div>
+                        </div>
+                    `;
+                } catch (err) {
+                    container.innerHTML = '<div class="text-red-600">Erro ao carregar estatísticas</div>';
+                }
+            },
+
+            async renderProfessores(container) {
+                if (this.currentUserData.tipo !== 'admin') {
+                    container.innerHTML = '<div class="text-red-600">Acesso restrito a administradores</div>';
+                    return;
+                }
+
+                const professores = await this.getCollection('users');
+                const profs = professores.filter(u => u.tipo === 'professor');
+
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">Professores</h2>
+                            <p class="text-gray-600">Gerencie os professores da instituição</p>
+                        </div>
+                        <button onclick="app.showModal('professor')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                            <i class="fas fa-plus"></i> Novo Professor
+                        </button>
+                    </div>
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm text-gray-600">
-                                <thead class="bg-gray-50 text-gray-800 font-semibold">
-                                    <tr>
-                                        <th class="px-6 py-3">Nome</th>
-                                        <th class="px-6 py-3">Email</th>
-                                        <th class="px-6 py-3">Data Cadastro</th>
-                                        <th class="px-6 py-3 text-right">Ações</th>
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-50 font-semibold text-gray-800">
+                                <tr>
+                                    <th class="px-6 py-3">Nome</th>
+                                    <th class="px-6 py-3">Email</th>
+                                    <th class="px-6 py-3 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                ${profs.map(p => `
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 font-medium text-gray-900">${p.nome}</td>
+                                        <td class="px-6 py-4">${p.email}</td>
+                                        <td class="px-6 py-4 text-right">
+                                            <button onclick="app.deleteDocument('users', '${p.id}')" class="text-red-600 hover:text-red-800 p-2">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200">
-                                    ${professores.map(p => `
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-6 py-4 font-medium text-gray-900">${p.nome}</td>
-                                            <td class="px-6 py-4">${p.email}</td>
-                                            <td class="px-6 py-4">${new Date(p.criado).toLocaleDateString()}</td>
-                                            <td class="px-6 py-4 text-right space-x-2">
-                                                <button onclick="app.editProfessor(${p.id})" class="text-blue-600 hover:text-blue-800">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button onclick="app.deleteProfessor(${p.id})" class="text-red-600 hover:text-red-800">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        ${professores.length === 0 ? '<p class="p-6 text-center text-gray-500">Nenhum professor cadastrado</p>' : ''}
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ${profs.length === 0 ? '<p class="p-6 text-center text-gray-500">Nenhum professor cadastrado</p>' : ''}
                     </div>
                 `;
             },
 
-            // ==================== TURMAS ====================
-            renderTurmas(container) {
-                let turmas = this.db.turmas;
-                if (this.currentUser.tipo === 'professor') {
-                    turmas = turmas.filter(t => t.professorId === this.currentUser.id);
-                } else if (this.currentUser.tipo === 'aluno') {
-                    turmas = turmas.filter(t => t.id === this.currentUser.turmaId);
-                }
-
+            async renderTurmas(container) {
+                const turmas = await this.getCollection('turmas');
+                const users = await this.getCollection('users');
+                
                 container.innerHTML = `
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-800">Turmas</h2>
-                            <p class="text-gray-600">Gerenciamento de turmas e matrículas</p>
-                        </div>
-                        ${this.currentUser.tipo !== 'aluno' ? `
-                        <div class="flex gap-2 flex-wrap">
-                            <button onclick="app.exportToExcel('turmas')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
-                                <i class="fas fa-file-excel"></i> Exportar
-                            </button>
-                            <button onclick="app.importFromExcel()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2">
-                                <i class="fas fa-file-import"></i> Importar
-                            </button>
-                            <button onclick="app.showModal('turma')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                                <i class="fas fa-plus"></i> Nova Turma
-                            </button>
-                        </div>
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Turmas</h2>
+                        ${this.currentUserData.tipo !== 'aluno' ? `
+                        <button onclick="app.showModal('turma')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i>Nova Turma
+                        </button>
                         ` : ''}
                     </div>
-
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        ${turmas.map(t => this.renderTurmaCard(t)).join('')}
-                    </div>
-
-                    ${turmas.length === 0 ? '<p class="text-center text-gray-500 mt-8">Nenhuma turma encontrada</p>' : ''}
-                `;
-            },
-
-            renderTurmaCard(turma) {
-                const alunosCount = turma.alunos ? turma.alunos.length : 0;
-                const professor = this.db.users.find(u => u.id === turma.professorId);
-                
-                return `
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden card-hover">
-                        <div class="h-32 bg-gradient-to-r from-blue-500 to-purple-600 relative p-6">
-                            <div class="absolute top-4 right-4">
-                                ${this.currentUser.tipo !== 'aluno' ? `
-                                <button onclick="app.showQRCode(${turma.id})" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-2 rounded-lg backdrop-blur-sm" title="QR Code de Matrícula">
-                                    <i class="fas fa-qrcode"></i>
-                                </button>
-                                ` : ''}
-                            </div>
-                            <h3 class="text-white text-xl font-bold mt-8">${turma.nome}</h3>
-                            <p class="text-blue-100 text-sm">${turma.serie} • ${turma.turno}</p>
-                        </div>
-                        <div class="p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="flex items-center space-x-2 text-sm text-gray-600">
-                                    <i class="fas fa-user-tie text-gray-400"></i>
-                                    <span>${professor ? professor.nome : 'Sem professor'}</span>
-                                </div>
-                                <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">
-                                    ${alunosCount} alunos
-                                </span>
-                            </div>
-                            
-                            <div class="flex gap-2">
-                                <button onclick="app.viewTurma(${turma.id})" class="flex-1 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
-                                    Ver Detalhes
-                                </button>
-                                ${this.currentUser.tipo !== 'aluno' ? `
-                                <button onclick="app.manageAlunos(${turma.id})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                                    Gerenciar Alunos
-                                </button>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },
-
-            // ==================== ALUNOS ====================
-            renderAlunos(container) {
-                let alunos = this.db.users.filter(u => u.tipo === 'aluno');
-                if (this.currentUser.tipo === 'professor') {
-                    const minhasTurmas = this.db.turmas.filter(t => t.professorId === this.currentUser.id);
-                    const meusAlunosIds = minhasTurmas.flatMap(t => t.alunos || []);
-                    alunos = alunos.filter(a => meusAlunosIds.includes(a.id));
-                }
-
-                container.innerHTML = `
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-800">Gerenciar Alunos</h2>
-                            <p class="text-gray-600">Cadastro e gerenciamento de alunos</p>
-                        </div>
-                        <div class="flex gap-2 flex-wrap">
-                            <button onclick="app.exportToExcel('alunos')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                                <i class="fas fa-file-excel mr-2"></i>Exportar
-                            </button>
-                            <button onclick="app.showModal('aluno')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                <i class="fas fa-plus mr-2"></i>Novo Aluno
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm text-gray-600">
-                                <thead class="bg-gray-50 text-gray-800 font-semibold">
-                                    <tr>
-                                        <th class="px-6 py-3">Matrícula</th>
-                                        <th class="px-6 py-3">Nome</th>
-                                        <th class="px-6 py-3">Email</th>
-                                        <th class="px-6 py-3">Turma</th>
-                                        <th class="px-6 py-3 text-right">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200">
-                                    ${alunos.map(a => {
-                                        const turma = this.db.turmas.find(t => t.id === a.turmaId);
-                                        return `
-                                            <tr class="hover:bg-gray-50">
-                                                <td class="px-6 py-4 font-mono text-xs">${a.matricula}</td>
-                                                <td class="px-6 py-4 font-medium text-gray-900">${a.nome}</td>
-                                                <td class="px-6 py-4">${a.email}</td>
-                                                <td class="px-6 py-4">${turma ? turma.nome : '-'}</td>
-                                                <td class="px-6 py-4 text-right space-x-2">
-                                                    <button onclick="app.editAluno(${a.id})" class="text-blue-600 hover:text-blue-800 p-2">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button onclick="app.deleteAluno(${a.id})" class="text-red-600 hover:text-red-800 p-2">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                `;
-            },
-
-            // ==================== PROVAS ====================
-            renderProvas(container) {
-                let provas = this.db.provas;
-                if (this.currentUser.tipo === 'professor') {
-                    provas = provas.filter(p => p.professorId === this.currentUser.id);
-                } else if (this.currentUser.tipo === 'aluno') {
-                    provas = provas.filter(p => p.turmaId === this.currentUser.turmaId && p.ativa);
-                }
-
-                container.innerHTML = `
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-800">Provas</h2>
-                            <p class="text-gray-600">Gerenciamento de avaliações</p>
-                        </div>
-                        ${this.currentUser.tipo !== 'aluno' ? `
-                        <button onclick="app.showModal('prova')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            <i class="fas fa-plus mr-2"></i>Criar Prova
-                        </button>
-                        ` : ''}
-                    </div>
-
-                    <div class="space-y-4">
-                        ${provas.map(p => this.renderProvaItem(p)).join('')}
-                    </div>
-
-                    ${provas.length === 0 ? '<p class="text-center text-gray-500 mt-8">Nenhuma prova disponível</p>' : ''}
-                `;
-            },
-
-            renderProvaItem(prova) {
-                const turma = this.db.turmas.find(t => t.id === prova.turmaId);
-                const isAluno = this.currentUser.tipo === 'aluno';
-                const jaFez = isAluno && this.db.notas.some(n => n.alunoId === this.currentUser.id && n.provaId === prova.id);
-                
-                return `
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 card-hover">
-                        <div class="flex flex-col md:flex-row justify-between gap-4">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <h3 class="text-lg font-bold text-gray-800">${prova.titulo}</h3>
-                                    ${prova.ativa ? 
-                                        '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Ativa</span>' : 
-                                        '<span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">Encerrada</span>'
-                                    }
-                                    ${jaFez ? '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Concluído</span>' : ''}
-                                </div>
-                                <p class="text-sm text-gray-600 mb-3">
-                                    <i class="fas fa-users mr-1"></i> ${turma ? turma.nome : 'Turma não definida'} • 
-                                    <i class="fas fa-question-circle mr-1"></i> ${prova.questoes.length} questões • 
-                                    <i class="fas fa-clock mr-1"></i> ${prova.tempoTotal}s total
-                                </p>
-                            </div>
-                            
-                            <div class="flex items-center gap-2">
-                                ${isAluno ? (
-                                    jaFez ? 
-                                    `<button onclick="app.verResultado(${prova.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                                        <i class="fas fa-chart-bar mr-2"></i>Ver Resultado
-                                    </button>` :
-                                    `<button onclick="app.iniciarProva(${prova.id})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                        <i class="fas fa-play mr-2"></i>Iniciar Prova
-                                    </button>`
-                                ) : `
-                                    <button onclick="app.editProva(${prova.id})" class="px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button onclick="app.toggleProva(${prova.id})" class="px-3 py-2 ${prova.ativa ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'} rounded-lg">
-                                        <i class="fas ${prova.ativa ? 'fa-ban' : 'fa-check'}"></i>
-                                    </button>
-                                    <button onclick="app.deleteProva(${prova.id})" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                `}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },
-
-            // ==================== SISTEMA DE PROVAS INTERATIVO ====================
-            iniciarProva(provaId) {
-                const prova = this.db.provas.find(p => p.id === provaId);
-                if (!prova) return;
-
-                this.currentProva = { ...prova, questaoAtual: 0, respostas: [], inicio: Date.now() };
-                
-                const content = document.getElementById('content-area');
-                content.innerHTML = `
-                    <div class="max-w-3xl mx-auto">
-                        <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                            <div class="bg-gray-900 text-white p-6">
-                                <h2 class="text-xl font-bold">${prova.titulo}</h2>
-                                <p class="text-gray-400 text-sm mt-1">Questão <span id="questao-numero">1</span> de ${prova.questoes.length}</p>
-                            </div>
-                            
-                            <div class="p-6 md:p-8">
-                                <div id="questao-container" class="space-y-6">
-                                    <!-- Questão será renderizada aqui -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                document.getElementById('quiz-timer-container').classList.remove('hidden');
-                this.renderQuestao();
-            },
-
-            renderQuestao() {
-                const prova = this.currentProva;
-                const questao = prova.questoes[prova.questaoAtual];
-                
-                document.getElementById('questao-numero').textContent = prova.questaoAtual + 1;
-                
-                const container = document.getElementById('questao-container');
-                container.innerHTML = `
-                    <div class="mb-6">
-                        <h3 class="text-xl font-semibold text-gray-800 mb-4">${questao.pergunta}</h3>
-                        <div class="space-y-3">
-                            ${questao.opcoes.map((opcao, idx) => `
-                                <button onclick="app.responderQuestao(${idx})" 
-                                    class="w-full text-left p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition flex items-center gap-3 group">
-                                    <div class="w-8 h-8 rounded-full bg-gray-200 group-hover:bg-blue-500 group-hover:text-white flex items-center justify-center font-semibold text-sm transition">
-                                        ${String.fromCharCode(65 + idx)}
-                                    </div>
-                                    <span class="text-gray-700">${opcao}</span>
-                                </button>
-                            `).join('')}
-                        </div>
-                    </div>
-                    
-                    <div class="flex justify-between items-center pt-4 border-t">
-                        <button onclick="app.finalizarProva()" class="text-red-600 hover:text-red-800 text-sm font-medium">
-                            <i class="fas fa-times mr-1"></i>Cancelar Prova
-                        </button>
-                        <span class="text-sm text-gray-500">
-                            Tempo por questão: ${questao.tempo}s
-                        </span>
-                    </div>
-                `;
-
-                this.iniciarTimer(questao.tempo);
-            },
-
-            iniciarTimer(segundos) {
-                if (this.timerInterval) clearInterval(this.timerInterval);
-                
-                let tempoRestante = segundos;
-                const barra = document.getElementById('timer-bar');
-                const display = document.getElementById('timer-display');
-                
-                this.timerInterval = setInterval(() => {
-                    tempoRestante--;
-                    const porcentagem = (tempoRestante / segundos) * 100;
-                    barra.style.width = porcentagem + '%';
-                    display.textContent = `${Math.floor(tempoRestante / 60).toString().padStart(2, '0')}:${(tempoRestante % 60).toString().padStart(2, '0')}`;
-                    
-                    if (tempoRestante <= 0) {
-                        clearInterval(this.timerInterval);
-                        this.responderQuestao(-1); // Timeout, resposta vazia
-                    }
-                }, 1000);
-            },
-
-            responderQuestao(respostaIndex) {
-                if (this.timerInterval) clearInterval(this.timerInterval);
-                
-                this.currentProva.respostas.push({
-                    questaoId: this.currentProva.questoes[this.currentProva.questaoAtual].id,
-                    resposta: respostaIndex
-                });
-                
-                this.currentProva.questaoAtual++;
-                
-                if (this.currentProva.questaoAtual < this.currentProva.questoes.length) {
-                    this.renderQuestao();
-                } else {
-                    this.finalizarProva();
-                }
-            },
-
-            finalizarProva() {
-                if (this.timerInterval) clearInterval(this.timerInterval);
-                document.getElementById('quiz-timer-container').classList.add('hidden');
-                
-                const prova = this.currentProva;
-                let acertos = 0;
-                
-                prova.respostas.forEach((resp, idx) => {
-                    if (resp.resposta === prova.questoes[idx].correta) acertos++;
-                });
-                
-                const nota = (acertos / prova.questoes.length) * 10;
-                
-                // Salvar nota
-                this.db.notas.push({
-                    id: Date.now(),
-                    alunoId: this.currentUser.id,
-                    provaId: prova.id,
-                    nota: parseFloat(nota.toFixed(1)),
-                    acertos,
-                    total: prova.questoes.length,
-                    data: new Date(),
-                    respostas: prova.respostas
-                });
-                
-                // Enviar email (simulado)
-                this.enviarEmailNotas(this.currentUser, prova, nota);
-                
-                this.saveData();
-                this.showToast(`Prova finalizada! Nota: ${nota.toFixed(1)}`, 'success');
-                this.renderResultado(prova, nota, acertos);
-            },
-
-            renderResultado(prova, nota, acertos) {
-                const content = document.getElementById('content-area');
-                const percentual = (acertos / prova.questoes.length) * 100;
-                let cor = 'red';
-                if (nota >= 6) cor = 'green';
-                else if (nota >= 4) cor = 'yellow';
-                
-                content.innerHTML = `
-                    <div class="max-w-2xl mx-auto fade-in">
-                        <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-8 text-center">
-                            <div class="w-24 h-24 bg-${cor}-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <i class="fas ${nota >= 6 ? 'fa-check' : 'fa-times'} text-4xl text-${cor}-600"></i>
-                            </div>
-                            
-                            <h2 class="text-2xl font-bold text-gray-800 mb-2">Prova Finalizada!</h2>
-                            <p class="text-gray-600 mb-6">Confira seu resultado abaixo</p>
-                            
-                            <div class="bg-gray-50 rounded-xl p-6 mb-6">
-                                <div class="text-5xl font-bold text-gray-900 mb-2">${nota.toFixed(1)}</div>
-                                <div class="text-sm text-gray-500">Nota Final</div>
-                            </div>
-                            
-                            <div class="grid grid-cols-3 gap-4 mb-8">
-                                <div class="p-4 bg-blue-50 rounded-lg">
-                                    <div class="text-2xl font-bold text-blue-600">${acertos}</div>
-                                    <div class="text-xs text-gray-600">Acertos</div>
-                                </div>
-                                <div class="p-4 bg-purple-50 rounded-lg">
-                                    <div class="text-2xl font-bold text-purple-600">${prova.questoes.length - acertos}</div>
-                                    <div class="text-xs text-gray-600">Erros</div>
-                                </div>
-                                <div class="p-4 bg-green-50 rounded-lg">
-                                    <div class="text-2xl font-bold text-green-600">${percentual.toFixed(0)}%</div>
-                                    <div class="text-xs text-gray-600">Aproveitamento</div>
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-2">
-                                <button onclick="app.navigate('minhas-notas')" class="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
-                                    Ver Todas as Notas
-                                </button>
-                                <button onclick="app.navigate('dashboard')" class="w-full py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                                    Voltar ao Dashboard
-                                </button>
-                            </div>
-                            
-                            <p class="mt-4 text-sm text-green-600">
-                                <i class="fas fa-envelope mr-1"></i>
-                                Resultado enviado para seu e-mail
-                            </p>
-                        </div>
-                    </div>
-                `;
-            },
-
-            enviarEmailNotas(aluno, prova, nota) {
-                // Simulação de envio de email
-                this.db.notificacoes.push({
-                    id: Date.now(),
-                    userId: aluno.id,
-                    mensagem: `Sua nota na prova "${prova.titulo}" foi ${nota.toFixed(1)}`,
-                    data: new Date(),
-                    lida: false
-                });
-                this.saveData();
-            },
-
-            // ==================== MATERIAIS ====================
-            renderMateriais(container) {
-                let materiais = this.db.materiais;
-                if (this.currentUser.tipo === 'professor') {
-                    materiais = materiais.filter(m => m.professorId === this.currentUser.id);
-                } else if (this.currentUser.tipo === 'aluno') {
-                    materiais = materiais.filter(m => m.turmaId === this.currentUser.turmaId);
-                }
-
-                container.innerHTML = `
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-800">Materiais</h2>
-                            <p class="text-gray-600">Arquivos e conteúdos disponíveis</p>
-                        </div>
-                        ${this.currentUser.tipo === 'professor' ? `
-                        <button onclick="app.showModal('material')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            <i class="fas fa-upload mr-2"></i>Enviar Material
-                        </button>
-                        ` : ''}
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        ${materiais.map(m => {
-                            const icones = { pdf: 'fa-file-pdf text-red-500', doc: 'fa-file-word text-blue-500', video: 'fa-file-video text-purple-500', default: 'fa-file text-gray-500' };
-                            const icone = icones[m.tipo] || icones.default;
-                            
-                            return `
-                                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 card-hover">
-                                    <div class="flex items-start justify-between mb-4">
-                                        <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                                            <i class="fas ${icone} text-2xl"></i>
-                                        </div>
-                                        <span class="text-xs text-gray-500">${new Date(m.data).toLocaleDateString()}</span>
-                                    </div>
-                                    <h3 class="font-bold text-gray-800 mb-2 truncate">${m.titulo}</h3>
-                                    <div class="flex gap-2 mt-4">
-                                        <a href="${m.url}" class="flex-1 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-center text-sm font-medium">
-                                            <i class="fas fa-download mr-1"></i>Baixar
-                                        </a>
-                                        ${this.currentUser.tipo === 'professor' ? `
-                                        <button onclick="app.deleteMaterial(${m.id})" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-
-                    ${materiais.length === 0 ? '<p class="text-center text-gray-500 mt-8">Nenhum material disponível</p>' : ''}
-                `;
-            },
-
-            // ==================== NOTAS ====================
-            renderLancarNotas(container) {
-                const turmas = this.db.turmas.filter(t => t.professorId === this.currentUser.id);
-                
-                container.innerHTML = `
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Lançar Notas</h2>
-                        <p class="text-gray-600">Gerenciamento de notas dos alunos</p>
-                    </div>
-
-                    <div class="space-y-6">
                         ${turmas.map(t => {
-                            const alunos = this.db.users.filter(u => u.tipo === 'aluno' && t.alunos?.includes(u.id));
+                            const prof = users.find(u => u.id === t.professorId);
                             return `
                                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                                        <h3 class="font-bold text-gray-800">${t.nome}</h3>
-                                        <span class="text-sm text-gray-600">${alunos.length} alunos</span>
+                                    <div class="h-32 bg-gradient-to-r from-blue-500 to-purple-600 p-6 flex justify-between items-start">
+                                        <div class="mt-4">
+                                            <h3 class="text-white text-xl font-bold">${t.nome}</h3>
+                                            <p class="text-blue-100 text-sm">${t.serie || ''} • ${t.turno || ''}</p>
+                                        </div>
+                                        <button onclick="app.showQRCode('${t.id}')" class="bg-white bg-opacity-20 p-2 rounded-lg text-white hover:bg-opacity-30" title="QR Code">
+                                            <i class="fas fa-qrcode"></i>
+                                        </button>
                                     </div>
                                     <div class="p-6">
-                                        <div class="overflow-x-auto">
-                                            <table class="w-full text-sm">
-                                                <thead>
-                                                    <tr class="border-b">
-                                                        <th class="text-left py-2">Aluno</th>
-                                                        <th class="text-left py-2">Matrícula</th>
-                                                        ${this.db.provas.filter(p => p.turmaId === t.id).map(p => 
-                                                            `<th class="text-center py-2">${p.titulo.substring(0, 20)}...</th>`
-                                                        ).join('')}
-                                                        <th class="text-center py-2">Ações</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    ${alunos.map(a => {
-                                                        const notasAluno = this.db.notas.filter(n => n.alunoId === a.id);
-                                                        return `
-                                                            <tr class="border-b hover:bg-gray-50">
-                                                                <td class="py-3 font-medium">${a.nome}</td>
-                                                                <td class="py-3 text-gray-500">${a.matricula}</td>
-                                                                ${this.db.provas.filter(p => p.turmaId === t.id).map(p => {
-                                                                    const nota = notasAluno.find(n => n.provaId === p.id);
-                                                                    return `<td class="py-3 text-center">${nota ? nota.nota : '-'}</td>`;
-                                                                }).join('')}
-                                                                <td class="py-3 text-center">
-                                                                    <button onclick="app.lancarNotaManual(${a.id}, ${t.id})" class="text-blue-600 hover:text-blue-800">
-                                                                        <i class="fas fa-edit"></i>
-                                                                    </button>
-                                                                </td>
-                                                            </tr>
-                                                        `;
-                                                    }).join('')}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <p class="text-sm text-gray-600 mb-4">Professor: ${prof ? prof.nome : 'Não atribuído'}</p>
+                                        <button onclick="app.viewTurma('${t.id}')" class="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium">
+                                            Ver Detalhes
+                                        </button>
                                     </div>
                                 </div>
                             `;
@@ -1249,683 +521,157 @@
                 `;
             },
 
-            renderMinhasNotas(container) {
-                const notas = this.db.notas.filter(n => n.alunoId === this.currentUser.id);
-                
+            async renderAlunos(container) {
+                const alunos = await this.getCollection('users');
+                const lista = alunos.filter(u => u.tipo === 'aluno');
+
                 container.innerHTML = `
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Minhas Notas</h2>
-                        <p class="text-gray-600">Histórico de avaliações</p>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div class="p-6 border-b border-gray-200">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm text-gray-600">Média Geral</p>
-                                    <p class="text-3xl font-bold text-gray-900">
-                                        ${notas.length ? (notas.reduce((a, b) => a + b.nota, 0) / notas.length).toFixed(1) : '-'}
-                                    </p>
-                                </div>
-                                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-star text-2xl text-blue-600"></i>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="divide-y divide-gray-200">
-                            ${notas.map(n => {
-                                const prova = this.db.provas.find(p => p.id === n.provaId);
-                                return `
-                                    <div class="p-6 flex items-center justify-between hover:bg-gray-50">
-                                        <div>
-                                            <h4 class="font-semibold text-gray-800">${prova ? prova.titulo : 'Prova'}</h4>
-                                            <p class="text-sm text-gray-500 mt-1">${new Date(n.data).toLocaleDateString()}</p>
-                                        </div>
-                                        <div class="text-right">
-                                            <span class="text-2xl font-bold ${n.nota >= 6 ? 'text-green-600' : 'text-red-600'}">${n.nota.toFixed(1)}</span>
-                                            <p class="text-xs text-gray-500">${n.acertos}/${n.total} acertos</p>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-
-                        ${notas.length === 0 ? '<p class="p-6 text-center text-gray-500">Nenhuma nota registrada</p>' : ''}
-                    </div>
-                `;
-            },
-
-            // ==================== MODAIS E FORMULÁRIOS ====================
-            showModal(type, editId = null) {
-                const modais = {
-                    professor: {
-                        title: editId ? 'Editar Professor' : 'Novo Professor',
-                        fields: `
-                            <input type="text" id="modal-nome" placeholder="Nome completo" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            <input type="email" id="modal-email" placeholder="Email" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            ${!editId ? `<input type="password" id="modal-senha" placeholder="Senha" class="w-full px-4 py-2 border rounded-lg mb-3" required>` : ''}
-                        `,
-                        onConfirm: () => this.saveProfessor(editId)
-                    },
-                    aluno: {
-                        title: editId ? 'Editar Aluno' : 'Novo Aluno',
-                        fields: `
-                            <input type="text" id="modal-nome" placeholder="Nome completo" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            <input type="email" id="modal-email" placeholder="Email" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            <input type="text" id="modal-matricula" placeholder="Matrícula" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            <select id="modal-turma" class="w-full px-4 py-2 border rounded-lg mb-3">
-                                <option value="">Selecione a turma</option>
-                                ${this.db.turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}
-                            </select>
-                            ${!editId ? `<input type="password" id="modal-senha" placeholder="Senha inicial" class="w-full px-4 py-2 border rounded-lg mb-3" required>` : ''}
-                        `,
-                        onConfirm: () => this.saveAluno(editId)
-                    },
-                    turma: {
-                        title: editId ? 'Editar Turma' : 'Nova Turma',
-                        fields: `
-                            <input type="text" id="modal-nome" placeholder="Nome da turma (ex: 1º Ano A)" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            <input type="text" id="modal-serie" placeholder="Série (ex: 1º Ano)" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            <select id="modal-turno" class="w-full px-4 py-2 border rounded-lg mb-3">
-                                <option value="Manhã">Manhã</option>
-                                <option value="Tarde">Tarde</option>
-                                <option value="Noite">Noite</option>
-                            </select>
-                            ${this.currentUser.tipo === 'admin' ? `
-                            <select id="modal-professor" class="w-full px-4 py-2 border rounded-lg mb-3">
-                                <option value="">Selecione o professor</option>
-                                ${this.db.users.filter(u => u.tipo === 'professor').map(p => `<option value="${p.id}">${p.nome}</option>`).join('')}
-                            </select>
-                            ` : ''}
-                        `,
-                        onConfirm: () => this.saveTurma(editId)
-                    },
-                    material: {
-                        title: 'Novo Material',
-                        fields: `
-                            <input type="text" id="modal-titulo" placeholder="Título do material" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            <select id="modal-turma" class="w-full px-4 py-2 border rounded-lg mb-3">
-                                ${this.db.turmas.filter(t => t.professorId === this.currentUser.id).map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}
-                            </select>
-                            <select id="modal-tipo" class="w-full px-4 py-2 border rounded-lg mb-3">
-                                <option value="pdf">PDF</option>
-                                <option value="doc">Documento Word</option>
-                                <option value="video">Vídeo</option>
-                                <option value="outro">Outro</option>
-                            </select>
-                            <input type="file" id="modal-arquivo" class="w-full px-4 py-2 border rounded-lg mb-3">
-                        `,
-                        onConfirm: () => this.saveMaterial()
-                    },
-                    prova: {
-                        title: 'Criar Nova Prova',
-                        fields: `
-                            <input type="text" id="modal-titulo" placeholder="Título da prova" class="w-full px-4 py-2 border rounded-lg mb-3" required>
-                            <select id="modal-turma" class="w-full px-4 py-2 border rounded-lg mb-3">
-                                ${this.db.turmas.filter(t => t.professorId === this.currentUser.id).map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}
-                            </select>
-                            <div id="questoes-container" class="space-y-4 mb-3">
-                                <!-- Questões serão adicionadas aqui -->
-                            </div>
-                            <button type="button" onclick="app.adicionarQuestaoForm()" class="w-full py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50">
-                                <i class="fas fa-plus mr-2"></i>Adicionar Questão
-                            </button>
-                        `,
-                        onConfirm: () => this.saveProva()
-                    }
-                };
-
-                const modal = modais[type];
-                if (!modal) return;
-
-                // Criar elemento modal
-                const modalDiv = document.createElement('div');
-                modalDiv.id = 'active-modal';
-                modalDiv.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
-                modalDiv.innerHTML = `
-                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto slide-in">
-                        <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                            <h3 class="text-xl font-bold text-gray-800">${modal.title}</h3>
-                            <button onclick="app.closeModal()" class="text-gray-400 hover:text-gray-600">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div class="p-6">
-                            <form id="modal-form" onsubmit="event.preventDefault(); ${modal.onConfirm}">
-                                ${modal.fields}
-                                <div class="flex justify-end gap-3 mt-6">
-                                    <button type="button" onclick="app.closeModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
-                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Salvar</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                `;
-
-                document.body.appendChild(modalDiv);
-                if (editId) this.preencherFormEdicao(type, editId);
-            },
-
-            closeModal() {
-                const modal = document.getElementById('active-modal');
-                if (modal) modal.remove();
-            },
-
-            questoesFormCount: 0,
-            adicionarQuestaoForm() {
-                this.questoesFormCount++;
-                const container = document.getElementById('questoes-container');
-                const div = document.createElement('div');
-                div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200';
-                div.innerHTML = `
-                    <div class="flex justify-between mb-2">
-                        <span class="font-semibold text-sm text-gray-700">Questão ${this.questoesFormCount}</span>
-                        <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm">
-                            <i class="fas fa-times"></i>
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Alunos</h2>
+                        <button onclick="app.showModal('aluno')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i>Novo Aluno
                         </button>
                     </div>
-                    <input type="text" name="pergunta-${this.questoesFormCount}" placeholder="Pergunta" class="w-full px-3 py-2 border rounded mb-2 text-sm" required>
-                    <div class="space-y-2 mb-2">
-                        <input type="text" name="opcao-${this.questoesFormCount}-0" placeholder="Opção A" class="w-full px-3 py-2 border rounded text-sm" required>
-                        <input type="text" name="opcao-${this.questoesFormCount}-1" placeholder="Opção B" class="w-full px-3 py-2 border rounded text-sm" required>
-                        <input type="text" name="opcao-${this.questoesFormCount}-2" placeholder="Opção C" class="w-full px-3 py-2 border rounded text-sm" required>
-                        <input type="text" name="opcao-${this.questoesFormCount}-3" placeholder="Opção D" class="w-full px-3 py-2 border rounded text-sm" required>
-                    </div>
-                    <div class="flex gap-2">
-                        <select name="correta-${this.questoesFormCount}" class="flex-1 px-3 py-2 border rounded text-sm">
-                            <option value="0">Resposta Correta: A</option>
-                            <option value="1">Resposta Correta: B</option>
-                            <option value="2">Resposta Correta: C</option>
-                            <option value="3">Resposta Correta: D</option>
-                        </select>
-                        <input type="number" name="tempo-${this.questoesFormCount}" placeholder="Segundos" value="30" class="w-24 px-3 py-2 border rounded text-sm" required>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3">Nome</th>
+                                    <th class="px-6 py-3">Email</th>
+                                    <th class="px-6 py-3 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                ${lista.map(a => `
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 font-medium">${a.nome}</td>
+                                        <td class="px-6 py-4">${a.email}</td>
+                                        <td class="px-6 py-4 text-right">
+                                            <button onclick="app.deleteDocument('users', '${a.id}')" class="text-red-600 hover:text-red-800">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
                     </div>
                 `;
-                container.appendChild(div);
             },
 
-            // ==================== OPERAÇÕES CRUD ====================
-            saveProfessor(editId) {
-                const nome = document.getElementById('modal-nome').value;
-                const email = document.getElementById('modal-email').value;
-                
-                if (editId) {
-                    const prof = this.db.users.find(u => u.id === editId);
-                    prof.nome = nome;
-                    prof.email = email;
-                } else {
-                    const senha = document.getElementById('modal-senha').value;
-                    this.db.users.push({
-                        id: Date.now(),
-                        nome,
-                        email,
-                        senha,
-                        tipo: 'professor',
-                        criado: new Date()
-                    });
-                }
-                
-                this.saveData();
-                this.closeModal();
-                this.showToast('Professor salvo com sucesso!', 'success');
-                this.renderContent();
+            async renderConfig(container) {
+                container.innerHTML = `
+                    <div class="max-w-2xl mx-auto">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Configurações</h2>
+                        
+                        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                            <h3 class="font-bold text-lg mb-2">Status do Firebase</h3>
+                            <p class="text-green-600 flex items-center gap-2">
+                                <i class="fas fa-check-circle"></i> Conectado ao projeto: educloud-sistema
+                            </p>
+                            <p class="text-sm text-gray-600 mt-2">Dados sincronizados em tempo real</p>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h3 class="font-bold text-lg text-red-600 mb-3">Zona de Perigo</h3>
+                            <p class="text-gray-600 mb-4">Estas ações afetam todos os dados na nuvem.</p>
+                            <button onclick="app.clearAllData()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                                <i class="fas fa-trash mr-2"></i>Limpar Todos os Dados
+                            </button>
+                        </div>
+                    </div>
+                `;
             },
 
-            saveAluno(editId) {
-                const nome = document.getElementById('modal-nome').value;
-                const email = document.getElementById('modal-email').value;
-                const matricula = document.getElementById('modal-matricula').value;
-                const turmaId = parseInt(document.getElementById('modal-turma').value);
-                
-                if (editId) {
-                    const aluno = this.db.users.find(u => u.id === editId);
-                    const turmaAntiga = this.db.turmas.find(t => t.id === aluno.turmaId);
-                    if (turmaAntiga) {
-                        turmaAntiga.alunos = turmaAntiga.alunos.filter(id => id !== editId);
+            showModal(type) {
+                if (type === 'professor') {
+                    const nome = prompt('Nome do professor:');
+                    const email = prompt('Email do professor:');
+                    const senha = prompt('Senha temporária (mín 6 caracteres):');
+                    
+                    if (nome && email && senha) {
+                        auth.createUserWithEmailAndPassword(email, senha).then(cred => {
+                            return db.collection('users').doc(cred.user.uid).set({
+                                nome, email, tipo: 'professor',
+                                criado: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }).then(() => {
+                            this.showToast('Professor criado!', 'success');
+                            this.renderContent();
+                        }).catch(err => alert(err.message));
                     }
+                } else if (type === 'turma') {
+                    const nome = prompt('Nome da turma (ex: 1º Ano A):');
+                    const serie = prompt('Série:');
+                    const turno = prompt('Turno (Manhã/Tarde/Noite):');
                     
-                    aluno.nome = nome;
-                    aluno.email = email;
-                    aluno.matricula = matricula;
-                    aluno.turmaId = turmaId;
-                } else {
-                    const senha = document.getElementById('modal-senha').value;
-                    const newId = Date.now();
-                    this.db.users.push({
-                        id: newId,
-                        nome,
-                        email,
-                        senha,
-                        tipo: 'aluno',
-                        matricula,
-                        turmaId,
-                        criado: new Date()
-                    });
-                    
-                    // Adicionar à turma
-                    const turma = this.db.turmas.find(t => t.id === turmaId);
-                    if (turma) {
-                        if (!turma.alunos) turma.alunos = [];
-                        turma.alunos.push(newId);
-                    }
-                    
-                    // Enviar email de boas-vindas
-                    this.db.notificacoes.push({
-                        id: Date.now(),
-                        userId: newId,
-                        mensagem: `Bem-vindo ao EduCloud! Sua matrícula é ${matricula}`,
-                        data: new Date(),
-                        lida: false
-                    });
-                }
-                
-                this.saveData();
-                this.closeModal();
-                this.showToast('Aluno salvo com sucesso!', 'success');
-                this.renderContent();
-            },
-
-            saveTurma(editId) {
-                const nome = document.getElementById('modal-nome').value;
-                const serie = document.getElementById('modal-serie').value;
-                const turno = document.getElementById('modal-turno').value;
-                const professorId = this.currentUser.tipo === 'admin' 
-                    ? parseInt(document.getElementById('modal-professor').value)
-                    : this.currentUser.id;
-                
-                if (editId) {
-                    const turma = this.db.turmas.find(t => t.id === editId);
-                    turma.nome = nome;
-                    turma.serie = serie;
-                    turma.turno = turno;
-                    turma.professorId = professorId;
-                } else {
-                    this.db.turmas.push({
-                        id: Date.now(),
-                        nome,
-                        serie,
-                        turno,
-                        professorId,
-                        alunos: []
-                    });
-                }
-                
-                this.saveData();
-                this.closeModal();
-                this.showToast('Turma salva com sucesso!', 'success');
-                this.renderContent();
-            },
-
-            saveMaterial() {
-                const titulo = document.getElementById('modal-titulo').value;
-                const turmaId = parseInt(document.getElementById('modal-turma').value);
-                const tipo = document.getElementById('modal-tipo').value;
-                
-                this.db.materiais.push({
-                    id: Date.now(),
-                    titulo,
-                    turmaId,
-                    tipo,
-                    professorId: this.currentUser.id,
-                    data: new Date(),
-                    url: '#'
-                });
-                
-                // Notificar alunos da turma
-                const turma = this.db.turmas.find(t => t.id === turmaId);
-                if (turma && turma.alunos) {
-                    turma.alunos.forEach(alunoId => {
-                        this.db.notificacoes.push({
-                            id: Date.now() + alunoId,
-                            userId: alunoId,
-                            mensagem: `Novo material disponível: ${titulo}`,
-                            data: new Date(),
-                            lida: false
+                    if (nome) {
+                        this.addDocument('turmas', {
+                            nome, serie, turno,
+                            professorId: this.currentUserData.tipo === 'professor' ? this.currentUser.uid : null,
+                            alunos: []
+                        }).then(() => {
+                            this.showToast('Turma criada!', 'success');
+                            this.renderContent();
                         });
-                    });
+                    }
                 }
-                
-                this.saveData();
-                this.closeModal();
-                this.showToast('Material enviado com sucesso!', 'success');
-                this.renderContent();
             },
 
-            saveProva() {
-                const titulo = document.getElementById('modal-titulo').value;
-                const turmaId = parseInt(document.getElementById('modal-turma').value);
-                const questoes = [];
-                
-                for (let i = 1; i <= this.questoesFormCount; i++) {
-                    const pergunta = document.querySelector(`[name="pergunta-${i}"]`)?.value;
-                    if (!pergunta) continue;
-                    
-                    const opcoes = [
-                        document.querySelector(`[name="opcao-${i}-0"]`).value,
-                        document.querySelector(`[name="opcao-${i}-1"]`).value,
-                        document.querySelector(`[name="opcao-${i}-2"]`).value,
-                        document.querySelector(`[name="opcao-${i}-3"]`).value
-                    ];
-                    
-                    questoes.push({
-                        id: i,
-                        tipo: 'multipla_escolha',
-                        pergunta,
-                        opcoes,
-                        correta: parseInt(document.querySelector(`[name="correta-${i}"]`).value),
-                        tempo: parseInt(document.querySelector(`[name="tempo-${i}"]`).value) || 30
-                    });
-                }
-                
-                const tempoTotal = questoes.reduce((acc, q) => acc + q.tempo, 0);
-                
-                this.db.provas.push({
-                    id: Date.now(),
-                    titulo,
-                    turmaId,
-                    professorId: this.currentUser.id,
-                    questoes,
-                    tempoTotal,
-                    ativa: false
-                });
-                
-                this.saveData();
-                this.questoesFormCount = 0;
-                this.closeModal();
-                this.showToast('Prova criada com sucesso!', 'success');
-                this.renderContent();
-            },
-
-            deleteProfessor(id) {
-                if (!confirm('Tem certeza que deseja excluir este professor?')) return;
-                this.db.users = this.db.users.filter(u => u.id !== id);
-                this.saveData();
-                this.showToast('Professor excluído', 'success');
-                this.renderContent();
-            },
-
-            deleteAluno(id) {
-                if (!confirm('Tem certeza que deseja excluir este aluno?')) return;
-                
-                // Remover das turmas
-                this.db.turmas.forEach(t => {
-                    if (t.alunos) t.alunos = t.alunos.filter(aid => aid !== id);
-                });
-                
-                this.db.users = this.db.users.filter(u => u.id !== id);
-                this.saveData();
-                this.showToast('Aluno excluído', 'success');
-                this.renderContent();
-            },
-
-            deleteProva(id) {
-                if (!confirm('Tem certeza que deseja excluir esta prova?')) return;
-                this.db.provas = this.db.provas.filter(p => p.id !== id);
-                this.saveData();
-                this.showToast('Prova excluída', 'success');
-                this.renderContent();
-            },
-
-            toggleProva(id) {
-                const prova = this.db.provas.find(p => p.id === id);
-                prova.ativa = !prova.ativa;
-                this.saveData();
-                this.showToast(`Prova ${prova.ativa ? 'ativada' : 'desativada'}`, 'success');
-                this.renderContent();
-            },
-
-            // ==================== QR CODE ====================
             showQRCode(turmaId) {
-                const turma = this.db.turmas.find(t => t.id === turmaId);
-                const qrData = JSON.stringify({ tipo: 'matricula', turmaId: turma.id, turmaNome: turma.nome });
-                
-                const modalDiv = document.createElement('div');
-                modalDiv.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
-                modalDiv.innerHTML = `
-                    <div class="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full text-center">
-                        <h3 class="text-xl font-bold mb-4">QR Code de Matrícula</h3>
-                        <p class="text-sm text-gray-600 mb-4">Turma: ${turma.nome}</p>
+                const div = document.createElement('div');
+                div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+                div.innerHTML = `
+                    <div class="bg-white rounded-xl p-8 text-center max-w-sm w-full">
+                        <h3 class="text-xl font-bold mb-4">QR Code da Turma</h3>
                         <div id="qrcode" class="flex justify-center mb-4"></div>
-                        <p class="text-xs text-gray-500 mb-4">Escaneie para matricular-se automaticamente</p>
-                        <button onclick="this.parentElement.parentElement.remove()" class="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Fechar</button>
+                        <p class="text-sm text-gray-600 mb-4">Escaneie para matricular-se</p>
+                        <button onclick="this.closest('.fixed').remove()" class="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Fechar</button>
                     </div>
                 `;
-                
-                document.body.appendChild(modalDiv);
-                
+                document.body.appendChild(div);
                 new QRCode(document.getElementById('qrcode'), {
-                    text: qrData,
+                    text: `https://educloud-sistema.web.app/matricula?turma=${turmaId}`,
                     width: 200,
-                    height: 200,
-                    colorDark: '#000000',
-                    colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel.H
+                    height: 200
                 });
             },
 
-            // ==================== IMPORT/EXPORT EXCEL ====================
-            exportToExcel(type) {
-                let data = [];
-                let filename = '';
+            viewTurma(id) {
+                alert('Detalhes da turma ' + id + ' (funcionalidade em desenvolvimento)');
+            },
+
+            async clearAllData() {
+                if (!confirm('ATENÇÃO: Isso apagará TODOS os dados permanentemente do Firebase!\n\nTem certeza?')) return;
                 
-                if (type === 'professores') {
-                    data = this.db.users.filter(u => u.tipo === 'professor').map(u => ({
-                        Nome: u.nome,
-                        Email: u.email,
-                        'Data Cadastro': new Date(u.criado).toLocaleDateString()
-                    }));
-                    filename = 'professores.xlsx';
-                } else if (type === 'alunos') {
-                    data = this.db.users.filter(u => u.tipo === 'aluno').map(u => {
-                        const turma = this.db.turmas.find(t => t.id === u.turmaId);
-                        return {
-                            Matricula: u.matricula,
-                            Nome: u.nome,
-                            Email: u.email,
-                            Turma: turma ? turma.nome : ''
-                        };
-                    });
-                    filename = 'alunos.xlsx';
-                } else if (type === 'turmas') {
-                    data = this.db.turmas.map(t => {
-                        const prof = this.db.users.find(u => u.id === t.professorId);
-                        return {
-                            Nome: t.nome,
-                            Serie: t.serie,
-                            Turno: t.turno,
-                            Professor: prof ? prof.nome : '',
-                            'Total Alunos': t.alunos ? t.alunos.length : 0
-                        };
-                    });
-                    filename = 'turmas.xlsx';
+                const collections = ['users', 'turmas', 'provas', 'notas', 'materiais'];
+                try {
+                    for (const col of collections) {
+                        const snapshot = await db.collection(col).get();
+                        const batch = db.batch();
+                        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                    }
+                    this.showToast('Todos os dados foram apagados', 'success');
+                    this.renderContent();
+                } catch (err) {
+                    alert('Erro ao limpar dados: ' + err.message);
                 }
-                
-                const ws = XLSX.utils.json_to_sheet(data);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-                XLSX.writeFile(wb, filename);
-                this.showToast('Arquivo exportado com sucesso!', 'success');
             },
 
-            importFromExcel() {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.xlsx, .xls';
-                input.onchange = (e) => {
-                    const file = e.target.files[0];
-                    const reader = new FileReader();
-                    
-                    reader.onload = (event) => {
-                        const data = new Uint8Array(event.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-                        
-                        // Processar importação de alunos
-                        let count = 0;
-                        jsonData.forEach(row => {
-                            if (row.Nome && row.Email && row.Matricula) {
-                                const existing = this.db.users.find(u => u.email === row.Email || u.matricula === row.Matricula);
-                                if (!existing) {
-                                    this.db.users.push({
-                                        id: Date.now() + count,
-                                        nome: row.Nome,
-                                        email: row.Email,
-                                        matricula: String(row.Matricula),
-                                        tipo: 'aluno',
-                                        senha: '123456',
-                                        turmaId: null,
-                                        criado: new Date()
-                                    });
-                                    count++;
-                                }
-                            }
-                        });
-                        
-                        this.saveData();
-                        this.showToast(`${count} alunos importados com sucesso!`, 'success');
-                        this.renderContent();
-                    };
-                    
-                    reader.readAsArrayBuffer(file);
-                };
-                input.click();
-            },
-
-            // ==================== UTILITÁRIOS ====================
             showToast(message, type = 'info') {
                 const container = document.getElementById('toast-container');
                 const toast = document.createElement('div');
+                const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500' };
                 
-                const colors = {
-                    success: 'bg-green-500',
-                    error: 'bg-red-500',
-                    info: 'bg-blue-500',
-                    warning: 'bg-yellow-500'
-                };
-                
-                const icons = {
-                    success: 'fa-check-circle',
-                    error: 'fa-exclamation-circle',
-                    info: 'fa-info-circle',
-                    warning: 'fa-exclamation-triangle'
-                };
-                
-                toast.className = `${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 transform transition-all duration-300 translate-x-full`;
-                toast.innerHTML = `
-                    <i class="fas ${icons[type]}"></i>
-                    <span class="font-medium">${message}</span>
-                `;
-                
+                toast.className = `${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg mb-2 fade-in`;
+                toast.textContent = message;
                 container.appendChild(toast);
-                
-                // Animate in
-                setTimeout(() => toast.classList.remove('translate-x-full'), 10);
-                
-                // Remove after 3 seconds
-                setTimeout(() => {
-                    toast.classList.add('translate-x-full', 'opacity-0');
-                    setTimeout(() => toast.remove(), 300);
-                }, 3000);
-            },
-
-            preencherFormEdicao(type, id) {
-                if (type === 'professor') {
-                    const prof = this.db.users.find(u => u.id === id);
-                    document.getElementById('modal-nome').value = prof.nome;
-                    document.getElementById('modal-email').value = prof.email;
-                } else if (type === 'aluno') {
-                    const aluno = this.db.users.find(u => u.id === id);
-                    document.getElementById('modal-nome').value = aluno.nome;
-                    document.getElementById('modal-email').value = aluno.email;
-                    document.getElementById('modal-matricula').value = aluno.matricula;
-                    document.getElementById('modal-turma').value = aluno.turmaId;
-                }
-            },
-
-            editProfessor(id) { this.showModal('professor', id); },
-            editAluno(id) { this.showModal('aluno', id); },
-            
-            manageAlunos(turmaId) {
-                // Implementação simplificada - mostrar modal de gerenciamento
-                this.showToast('Funcionalidade de gerenciamento de alunos na turma', 'info');
-            },
-            
-            viewTurma(turmaId) {
-                const turma = this.db.turmas.find(t => t.id === turmaId);
-                this.showToast(`Visualizando turma: ${turma.nome}`, 'info');
-            },
-
-            verResultado(provaId) {
-                const nota = this.db.notas.find(n => n.alunoId === this.currentUser.id && n.provaId === provaId);
-                if (nota) {
-                    const prova = this.db.provas.find(p => p.id === provaId);
-                    this.renderResultado(prova, nota.nota, nota.acertos);
-                }
-            },
-
-            lancarNotaManual(alunoId, turmaId) {
-                const nota = prompt('Digite a nota (0-10):');
-                if (nota && !isNaN(nota)) {
-                    this.db.notas.push({
-                        id: Date.now(),
-                        alunoId,
-                        provaId: null,
-                        nota: parseFloat(nota),
-                        descricao: 'Nota manual',
-                        data: new Date()
-                    });
-                    this.saveData();
-                    this.showToast('Nota lançada com sucesso!', 'success');
-                    this.renderContent();
-                }
-            },
-
-            renderConfig(container) {
-                container.innerHTML = `
-                    <div class="max-w-2xl">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Configurações do Sistema</h2>
-                        
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-                            <h3 class="font-bold text-lg mb-4">Backup de Dados</h3>
-                            <p class="text-gray-600 mb-4">Exporte todos os dados do sistema para backup local.</p>
-                            <button onclick="app.backupAllData()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                <i class="fas fa-download mr-2"></i>Baixar Backup Completo
-                            </button>
-                        </div>
-
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                            <h3 class="font-bold text-lg mb-4 text-red-600">Zona de Perigo</h3>
-                            <p class="text-gray-600 mb-4">Limpar todos os dados do sistema. Esta ação não pode ser desfeita.</p>
-                            <button onclick="app.clearAllData()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                                <i class="fas fa-trash mr-2"></i>Apagar Todos os Dados
-                            </button>
-                        </div>
-                    </div>
-                `;
-            },
-
-            backupAllData() {
-                const dataStr = JSON.stringify(this.db, null, 2);
-                const blob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `educloud_backup_${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                this.showToast('Backup baixado com sucesso!', 'success');
-            },
-
-            clearAllData() {
-                if (confirm('ATENÇÃO: Isso apagará TODOS os dados permanentemente. Deseja continuar?')) {
-                    localStorage.removeItem('educloud_data');
-                    location.reload();
-                }
+                setTimeout(() => toast.remove(), 3000);
             }
         };
 
-        // Inicializar aplicação quando DOM estiver pronto
+        // Iniciar app
         document.addEventListener('DOMContentLoaded', () => {
             app.init();
         });
