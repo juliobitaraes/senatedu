@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduCloud Pro - Sistema com Firebase</title>
+    <title>SENATEDU - Sistema de Gestão Escolar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -17,7 +17,7 @@
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
@@ -25,8 +25,10 @@
         .sync-status { position: fixed; bottom: 20px; right: 20px; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 100; }
         .sync-online { background: #10b981; color: white; }
         .sync-offline { background: #ef4444; color: white; }
-        .timer-bar { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 1s linear; }
+        .timer-bar { height: 100%; background: linear-gradient(90deg, #2563eb, #1e40af); transition: width 1s linear; }
         .quiz-timer { width: 100%; height: 4px; background: #e5e7eb; position: fixed; top: 0; left: 0; z-index: 50; }
+        .card-hover { transition: all 0.2s; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
     </style>
 </head>
 <body class="text-gray-800 antialiased">
@@ -38,16 +40,16 @@
 
     <div id="app"></div>
 
-    <!-- Template: Login Firebase -->
+    <!-- Template: Login -->
     <template id="login-template">
-        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 p-4">
+        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-800 via-blue-600 to-blue-500 p-4">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 fade-in">
                 <div class="text-center space-y-2">
-                    <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-4">
+                    <div class="w-20 h-20 bg-gradient-to-br from-blue-700 to-blue-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-4">
                         <i class="fas fa-graduation-cap text-3xl text-white"></i>
                     </div>
-                    <h1 class="text-3xl font-bold text-gray-900">EduCloud Pro</h1>
-                    <p class="text-gray-500">Sistema em Nuvem com Firebase</p>
+                    <h1 class="text-3xl font-bold text-gray-900">SENATEDU</h1>
+                    <p class="text-gray-500">Sistema de Gestão Escolar</p>
                 </div>
                 
                 <div id="login-error" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
@@ -61,7 +63,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
                         <input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••">
                     </div>
-                    <button type="submit" id="login-btn" class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
+                    <button type="submit" id="login-btn" class="w-full bg-blue-700 text-white py-2 rounded-lg font-semibold hover:bg-blue-800 transition">
                         <span id="btn-text">Entrar</span>
                     </button>
                 </form>
@@ -78,25 +80,25 @@
 
     <template id="main-layout">
         <div class="min-h-screen flex flex-col md:flex-row">
-            <aside id="sidebar" class="bg-gray-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block">
-                <div class="p-6 border-b border-gray-800">
+            <aside id="sidebar" class="bg-slate-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block">
+                <div class="p-6 border-b border-slate-800">
                     <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center">
                             <i class="fas fa-graduation-cap text-lg"></i>
                         </div>
                         <div>
-                            <h1 class="text-xl font-bold">EduCloud</h1>
-                            <p class="text-xs text-gray-400" id="user-role">...</p>
+                            <h1 class="text-xl font-bold">SENATEDU</h1>
+                            <p class="text-xs text-slate-400" id="user-role">...</p>
                         </div>
                     </div>
                 </div>
                 <nav class="p-4 space-y-2" id="sidebar-nav"></nav>
-                <div class="absolute bottom-0 w-full p-4 border-t border-gray-800 bg-gray-900">
+                <div class="absolute bottom-0 w-full p-4 border-t border-slate-800 bg-slate-900">
                     <div class="flex items-center space-x-3 mb-3">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-sm font-bold" id="user-avatar">U</div>
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold" id="user-avatar">U</div>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium truncate" id="user-name">...</p>
-                            <p class="text-xs text-gray-400 truncate" id="user-email">...</p>
+                            <p class="text-xs text-slate-400 truncate" id="user-email">...</p>
                         </div>
                     </div>
                     <button onclick="app.logout()" class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition text-sm">
@@ -108,7 +110,7 @@
             <main class="flex-1 md:ml-64 min-h-screen">
                 <div class="md:hidden bg-white shadow-sm p-4 flex items-center justify-between sticky top-0 z-10">
                     <button onclick="app.toggleSidebar()" class="text-gray-600"><i class="fas fa-bars text-xl"></i></button>
-                    <span class="font-semibold">EduCloud</span>
+                    <span class="font-semibold text-blue-800">SENATEDU</span>
                     <div class="w-8"></div>
                 </div>
                 <div id="content-area" class="p-4 md:p-8 fade-in"></div>
@@ -147,7 +149,6 @@
             monitorAuth() {
                 auth.onAuthStateChanged(async (user) => {
                     if (user) {
-                        // Buscar dados adicionais do usuário no Firestore
                         const doc = await db.collection('users').doc(user.uid).get();
                         if (doc.exists) {
                             this.currentUser = user;
@@ -235,10 +236,8 @@
                 }
                 
                 try {
-                    // Criar usuário na autenticação
                     const userCred = await auth.createUserWithEmailAndPassword(email, senha);
                     
-                    // Salvar dados no Firestore
                     await db.collection('users').doc(userCred.user.uid).set({
                         nome: nome,
                         email: email,
@@ -302,7 +301,7 @@
                 const items = menus[type] || [];
                 nav.innerHTML = items.map(item => `
                     <button onclick="app.navigate('${item.id}')" 
-                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition ${this.currentView === item.id ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}">
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition ${this.currentView === item.id ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}">
                         <i class="fas ${item.icon} w-5"></i>
                         <span>${item.label}</span>
                     </button>
@@ -323,7 +322,6 @@
                 }
             },
 
-            // ==================== FIRESTORE CRUD ====================
             async getCollection(collection) {
                 try {
                     const snapshot = await db.collection(collection).get();
@@ -362,7 +360,6 @@
                 }
             },
 
-            // ==================== RENDERIZAÇÃO ====================
             async renderContent() {
                 const content = document.getElementById('content-area');
                 content.innerHTML = '<div class="flex justify-center p-8"><div class="loading border-blue-600 border-t-transparent"></div></div>';
@@ -396,33 +393,33 @@
                     container.innerHTML = `
                         <div class="mb-6">
                             <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
-                            <p class="text-gray-600">Dados sincronizados em tempo real</p>
+                            <p class="text-gray-600">Bem-vindo ao SENATEDU</p>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
                                 <div class="flex items-center justify-between mb-4">
                                     <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-chalkboard-teacher text-xl"></i></div>
                                 </div>
                                 <h3 class="text-gray-500 text-sm font-medium">Professores</h3>
                                 <p class="text-2xl font-bold text-gray-900 mt-1">${totalProf}</p>
                             </div>
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
                                 <div class="flex items-center justify-between mb-4">
-                                    <div class="p-3 rounded-lg bg-green-100 text-green-600"><i class="fas fa-user-graduate text-xl"></i></div>
+                                    <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-user-graduate text-xl"></i></div>
                                 </div>
                                 <h3 class="text-gray-500 text-sm font-medium">Alunos</h3>
                                 <p class="text-2xl font-bold text-gray-900 mt-1">${totalAlunos}</p>
                             </div>
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
                                 <div class="flex items-center justify-between mb-4">
-                                    <div class="p-3 rounded-lg bg-purple-100 text-purple-600"><i class="fas fa-users text-xl"></i></div>
+                                    <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-users text-xl"></i></div>
                                 </div>
                                 <h3 class="text-gray-500 text-sm font-medium">Turmas</h3>
                                 <p class="text-2xl font-bold text-gray-900 mt-1">${totalTurmas}</p>
                             </div>
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
                                 <div class="flex items-center justify-between mb-4">
-                                    <div class="p-3 rounded-lg bg-orange-100 text-orange-600"><i class="fas fa-file-alt text-xl"></i></div>
+                                    <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-file-alt text-xl"></i></div>
                                 </div>
                                 <h3 class="text-gray-500 text-sm font-medium">Provas</h3>
                                 <p class="text-2xl font-bold text-gray-900 mt-1">${totalProvas}</p>
@@ -449,13 +446,13 @@
                             <h2 class="text-2xl font-bold text-gray-800">Professores</h2>
                             <p class="text-gray-600">Gerencie os professores da instituição</p>
                         </div>
-                        <button onclick="app.showModal('professor')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                        <button onclick="app.showModal('professor')" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 flex items-center gap-2">
                             <i class="fas fa-plus"></i> Novo Professor
                         </button>
                     </div>
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                         <table class="w-full text-left text-sm">
-                            <thead class="bg-gray-50 font-semibold text-gray-800">
+                            <thead class="bg-slate-50 font-semibold text-gray-800">
                                 <tr>
                                     <th class="px-6 py-3">Nome</th>
                                     <th class="px-6 py-3">Email</th>
@@ -464,7 +461,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 ${profs.map(p => `
-                                    <tr class="hover:bg-gray-50">
+                                    <tr class="hover:bg-slate-50">
                                         <td class="px-6 py-4 font-medium text-gray-900">${p.nome}</td>
                                         <td class="px-6 py-4">${p.email}</td>
                                         <td class="px-6 py-4 text-right">
@@ -489,7 +486,7 @@
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Turmas</h2>
                         ${this.currentUserData.tipo !== 'aluno' ? `
-                        <button onclick="app.showModal('turma')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <button onclick="app.showModal('turma')" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
                             <i class="fas fa-plus mr-2"></i>Nova Turma
                         </button>
                         ` : ''}
@@ -498,8 +495,8 @@
                         ${turmas.map(t => {
                             const prof = users.find(u => u.id === t.professorId);
                             return `
-                                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                    <div class="h-32 bg-gradient-to-r from-blue-500 to-purple-600 p-6 flex justify-between items-start">
+                                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden card-hover">
+                                    <div class="h-32 bg-gradient-to-r from-blue-700 to-blue-500 p-6 flex justify-between items-start">
                                         <div class="mt-4">
                                             <h3 class="text-white text-xl font-bold">${t.nome}</h3>
                                             <p class="text-blue-100 text-sm">${t.serie || ''} • ${t.turno || ''}</p>
@@ -510,7 +507,7 @@
                                     </div>
                                     <div class="p-6">
                                         <p class="text-sm text-gray-600 mb-4">Professor: ${prof ? prof.nome : 'Não atribuído'}</p>
-                                        <button onclick="app.viewTurma('${t.id}')" class="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium">
+                                        <button onclick="app.viewTurma('${t.id}')" class="w-full py-2 border border-gray-300 rounded-lg hover:bg-slate-50 text-sm font-medium">
                                             Ver Detalhes
                                         </button>
                                     </div>
@@ -528,13 +525,13 @@
                 container.innerHTML = `
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Alunos</h2>
-                        <button onclick="app.showModal('aluno')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <button onclick="app.showModal('aluno')" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
                             <i class="fas fa-plus mr-2"></i>Novo Aluno
                         </button>
                     </div>
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
                         <table class="w-full text-left text-sm">
-                            <thead class="bg-gray-50">
+                            <thead class="bg-slate-50">
                                 <tr>
                                     <th class="px-6 py-3">Nome</th>
                                     <th class="px-6 py-3">Email</th>
@@ -543,7 +540,7 @@
                             </thead>
                             <tbody class="divide-y">
                                 ${lista.map(a => `
-                                    <tr class="hover:bg-gray-50">
+                                    <tr class="hover:bg-slate-50">
                                         <td class="px-6 py-4 font-medium">${a.nome}</td>
                                         <td class="px-6 py-4">${a.email}</td>
                                         <td class="px-6 py-4 text-right">
@@ -562,19 +559,19 @@
             async renderConfig(container) {
                 container.innerHTML = `
                     <div class="max-w-2xl mx-auto">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Configurações</h2>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Configurações SENATEDU</h2>
                         
                         <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
                             <h3 class="font-bold text-lg mb-2">Status do Firebase</h3>
                             <p class="text-green-600 flex items-center gap-2">
-                                <i class="fas fa-check-circle"></i> Conectado ao projeto: educloud-sistema
+                                <i class="fas fa-check-circle"></i> Conectado ao projeto
                             </p>
-                            <p class="text-sm text-gray-600 mt-2">Dados sincronizados em tempo real</p>
+                            <p class="text-sm text-gray-600 mt-2">Sincronização ativa em tempo real</p>
                         </div>
 
                         <div class="bg-white rounded-xl shadow-sm p-6">
-                            <h3 class="font-bold text-lg text-red-600 mb-3">Zona de Perigo</h3>
-                            <p class="text-gray-600 mb-4">Estas ações afetam todos os dados na nuvem.</p>
+                            <h3 class="font-bold text-lg text-red-600 mb-3">Aviso</h3>
+                            <p class="text-gray-600 mb-4">Limpar dados afetará todos os usuários do SENATEDU.</p>
                             <button onclick="app.clearAllData()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
                                 <i class="fas fa-trash mr-2"></i>Limpar Todos os Dados
                             </button>
@@ -615,6 +612,23 @@
                             this.renderContent();
                         });
                     }
+                } else if (type === 'aluno') {
+                    const nome = prompt('Nome do aluno:');
+                    const email = prompt('Email do aluno:');
+                    const senha = prompt('Senha temporária (mín 6 caracteres):');
+                    
+                    if (nome && email && senha) {
+                        auth.createUserWithEmailAndPassword(email, senha).then(cred => {
+                            return db.collection('users').doc(cred.user.uid).set({
+                                nome, email, tipo: 'aluno',
+                                criado: firebase.firestore.FieldValue.serverTimestamp(),
+                                matricula: Date.now().toString().slice(-6)
+                            });
+                        }).then(() => {
+                            this.showToast('Aluno criado!', 'success');
+                            this.renderContent();
+                        }).catch(err => alert(err.message));
+                    }
                 }
             },
 
@@ -623,17 +637,19 @@
                 div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
                 div.innerHTML = `
                     <div class="bg-white rounded-xl p-8 text-center max-w-sm w-full">
-                        <h3 class="text-xl font-bold mb-4">QR Code da Turma</h3>
+                        <h3 class="text-xl font-bold mb-4 text-blue-800">QR Code SENATEDU</h3>
                         <div id="qrcode" class="flex justify-center mb-4"></div>
                         <p class="text-sm text-gray-600 mb-4">Escaneie para matricular-se</p>
-                        <button onclick="this.closest('.fixed').remove()" class="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Fechar</button>
+                        <button onclick="this.closest('.fixed').remove()" class="w-full py-2 bg-slate-200 rounded-lg hover:bg-slate-300">Fechar</button>
                     </div>
                 `;
                 document.body.appendChild(div);
                 new QRCode(document.getElementById('qrcode'), {
                     text: `https://educloud-sistema.web.app/matricula?turma=${turmaId}`,
                     width: 200,
-                    height: 200
+                    height: 200,
+                    colorDark: '#1e40af',
+                    colorLight: '#ffffff'
                 });
             },
 
@@ -642,7 +658,7 @@
             },
 
             async clearAllData() {
-                if (!confirm('ATENÇÃO: Isso apagará TODOS os dados permanentemente do Firebase!\n\nTem certeza?')) return;
+                if (!confirm('ATENÇÃO: Isso apagará TODOS os dados permanentemente!\n\nTem certeza?')) return;
                 
                 const collections = ['users', 'turmas', 'provas', 'notas', 'materiais'];
                 try {
@@ -662,7 +678,7 @@
             showToast(message, type = 'info') {
                 const container = document.getElementById('toast-container');
                 const toast = document.createElement('div');
-                const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500' };
+                const colors = { success: 'bg-blue-600', error: 'bg-red-500', info: 'bg-blue-800' };
                 
                 toast.className = `${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg mb-2 fade-in`;
                 toast.textContent = message;
@@ -671,7 +687,6 @@
             }
         };
 
-        // Iniciar app
         document.addEventListener('DOMContentLoaded', () => {
             app.init();
         });
