@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SENATEDU - Sistema de Gestão Escolar</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Habilita modo escuro via classe 'dark'
+        }
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -16,7 +21,7 @@
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+        body { font-family: 'Inter', sans-serif; }
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
@@ -26,11 +31,9 @@
         .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
         .badge-green { background-color: #dcfce7; color: #166534; }
         .badge-blue { background-color: #dbeafe; color: #1e40af; }
-        .badge-yellow { background-color: #fef9c3; color: #854d0e; }
-        .badge-red { background-color: #fee2e2; color: #991b1b; }
     </style>
 </head>
-<body class="text-gray-800 antialiased">
+<body class="bg-slate-50 text-gray-800 antialiased transition-colors duration-300 dark:bg-slate-900 dark:text-gray-100">
 
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
     <div id="app"></div>
@@ -57,14 +60,31 @@
             currentUser: null,
             currentUserData: null,
             currentView: 'dashboard',
-            currentMaterialType: 'arquivo',
             tempQuestoes: [],
             provaTimer: null,
-            
+            isDarkMode: localStorage.getItem('theme') === 'dark',
+
             init() {
+                this.applyTheme();
                 this.monitorAuth();
             },
 
+            // ==================== TEMA ESCURO ====================
+            toggleTheme() {
+                this.isDarkMode = !this.isDarkMode;
+                localStorage.setItem('theme', this.isDarkMode ? 'dark' : 'light');
+                this.applyTheme();
+            },
+
+            applyTheme() {
+                if (this.isDarkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            },
+
+            // ==================== AUTENTICAÇÃO ====================
             monitorAuth() {
                 auth.onAuthStateChanged(async (user) => {
                     if (user) {
@@ -73,6 +93,7 @@
                             if (doc.exists) {
                                 this.currentUser = user;
                                 this.currentUserData = { id: user.uid, ...doc.data() };
+                                this.currentView = 'dashboard'; // Força Dashboard ao logar
                                 this.renderMainLayout();
                             } else {
                                 auth.signOut();
@@ -87,37 +108,37 @@
                 });
             },
 
-            // ==================== LOGIN & LAYOUT ====================
+            // ==================== LAYOUTS ====================
 
             renderLogin() {
                 document.getElementById('app').innerHTML = `
-                    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-800 via-blue-600 to-blue-500 p-4">
-                        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 fade-in">
+                    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-700 to-blue-600 p-4 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 fade-in border border-gray-100 dark:border-slate-700">
                             <div class="text-center">
                                 <div class="w-20 h-20 bg-gradient-to-br from-blue-700 to-blue-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-4">
                                     <i class="fas fa-graduation-cap text-3xl text-white"></i>
                                 </div>
-                                <h1 class="text-3xl font-bold text-gray-900">SENATEDU</h1>
-                                <p class="text-gray-500">Sistema de Gestão Escolar</p>
+                                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">SENATEDU</h1>
+                                <p class="text-gray-500 dark:text-gray-400">Sistema de Gestão Escolar</p>
                             </div>
                             
-                            <div id="login-error" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
+                            <div id="login-error" class="hidden p-3 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 rounded-lg text-sm text-center"></div>
                             
                             <form id="login-form" class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                    <input type="email" id="login-email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="admin@escola.com">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                                    <input type="email" id="login-email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="admin@escola.com">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                                    <input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Senha</label>
+                                    <input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="••••••">
                                 </div>
-                                <button type="submit" id="login-btn" class="w-full bg-blue-700 text-white py-2 rounded-lg font-semibold hover:bg-blue-800 transition">
+                                <button type="submit" id="login-btn" class="w-full bg-blue-700 hover:bg-blue-800 text-white py-2 rounded-lg font-semibold transition shadow-lg">
                                     <span id="btn-text">Entrar</span>
                                 </button>
                             </form>
                             <div class="text-center text-sm">
-                                <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">Criar conta de Administrador</button>
+                                <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium">Criar conta de Administrador</button>
                             </div>
                         </div>
                     </div>
@@ -143,20 +164,15 @@
 
             async setupFirstAdmin() {
                 const nome = prompt('Digite seu nome completo:');
-                const email = prompt('Digite seu email (será o login):');
-                const senha = prompt('Crie uma senha (mínimo 6 caracteres):');
-                
+                const email = prompt('Digite seu email:');
+                const senha = prompt('Crie uma senha:');
                 if (!nome || !email || !senha) return;
-                
                 try {
                     const userCred = await auth.createUserWithEmailAndPassword(email, senha);
                     await db.collection('users').doc(userCred.user.uid).set({
-                        nome: nome,
-                        email: email,
-                        tipo: 'admin',
-                        criado: firebase.firestore.FieldValue.serverTimestamp()
+                        nome: nome, email: email, tipo: 'admin', criado: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    alert('Administrador criado com sucesso!');
+                    alert('Admin criado!');
                 } catch (err) { alert('Erro: ' + err.message); }
             },
 
@@ -164,45 +180,59 @@
 
             renderMainLayout() {
                 document.getElementById('app').innerHTML = `
-                    <div class="min-h-screen flex flex-col md:flex-row">
-                        <aside id="sidebar" class="bg-slate-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block">
+                    <div class="min-h-screen flex flex-col md:flex-row bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+                        <aside id="sidebar" class="bg-slate-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block border-r border-slate-800">
                             <div class="p-6 border-b border-slate-800">
                                 <div class="flex items-center space-x-3">
                                     <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-graduation-cap text-lg"></i>
+                                        <i class="fas fa-graduation-cap text-lg text-white"></i>
                                     </div>
                                     <div>
-                                        <h1 class="text-xl font-bold">SENATEDU</h1>
-                                        <p class="text-xs text-slate-400">${this.capitalize(this.currentUserData.tipo)}</p>
+                                        <h1 class="text-xl font-bold text-white">SENATEDU</h1>
+                                        <p class="text-xs text-slate-400 font-mono uppercase">${this.capitalize(this.currentUserData.tipo)}</p>
                                     </div>
                                 </div>
                             </div>
+                            
                             <nav class="p-4 space-y-2" id="sidebar-nav"></nav>
-                            <div class="absolute bottom-0 w-full p-4 border-t border-slate-800 bg-slate-900">
-                                <div class="flex items-center space-x-3 mb-3">
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold">
-                                        ${this.currentUserData.nome.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-sm font-medium truncate">${this.currentUserData.nome}</p>
-                                        <p class="text-xs text-slate-400 truncate">${this.currentUserData.email}</p>
-                                    </div>
-                                </div>
-                                <button onclick="app.logout()" class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition text-sm">
-                                    <i class="fas fa-sign-out-alt"></i> <span>Sair</span>
+                            
+                            <div class="absolute bottom-0 w-full bg-slate-900 border-t border-slate-800">
+                                <button onclick="app.toggleTheme()" class="w-full flex items-center px-6 py-3 text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                                    <i class="fas ${this.isDarkMode ? 'fa-sun' : 'fa-moon'} w-6"></i>
+                                    <span class="text-sm">${this.isDarkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
                                 </button>
+                                
+                                <div class="p-4">
+                                    <div class="flex items-center space-x-3 mb-3 px-2">
+                                        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">
+                                            ${this.currentUserData.nome.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-xs font-medium truncate text-white">${this.currentUserData.nome}</p>
+                                        </div>
+                                    </div>
+                                    <button onclick="app.logout()" class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition text-sm">
+                                        <i class="fas fa-sign-out-alt"></i> <span>Sair</span>
+                                    </button>
+                                </div>
                             </div>
                         </aside>
 
-                        <main class="flex-1 md:ml-64 min-h-screen">
-                            <div class="md:hidden bg-white shadow-sm p-4 flex items-center justify-between sticky top-0 z-10">
-                                <button onclick="document.getElementById('sidebar').classList.toggle('hidden')" class="text-gray-600">
+                        <main class="flex-1 md:ml-64 min-h-screen relative">
+                            <div class="md:hidden bg-white dark:bg-slate-800 shadow-sm p-4 flex items-center justify-between sticky top-0 z-20 border-b dark:border-slate-700">
+                                <button onclick="document.getElementById('sidebar').classList.toggle('hidden')" class="text-gray-600 dark:text-gray-300">
                                     <i class="fas fa-bars text-xl"></i>
                                 </button>
-                                <span class="font-semibold text-blue-800">SENATEDU</span>
-                                <div class="w-8"></div>
+                                <div class="flex items-center space-x-2">
+                                    <i class="fas fa-graduation-cap text-blue-600 text-xl"></i>
+                                    <span class="font-bold text-gray-800 dark:text-white">SENATEDU</span>
+                                </div>
+                                <button onclick="app.toggleTheme()" class="text-gray-600 dark:text-yellow-400">
+                                    <i class="fas ${this.isDarkMode ? 'fa-sun' : 'fa-moon'} text-xl"></i>
+                                </button>
                             </div>
-                            <div id="content-area" class="p-4 md:p-8 fade-in"></div>
+
+                            <div id="content-area" class="p-4 md:p-8 fade-in pb-20"></div>
                         </main>
                     </div>
                 `;
@@ -215,6 +245,7 @@
                 const nav = document.getElementById('sidebar-nav');
                 const type = this.currentUserData.tipo;
                 
+                // Dashboard é sempre o primeiro para todos
                 const menus = {
                     admin: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
@@ -240,8 +271,8 @@
                 const items = menus[type] || [];
                 nav.innerHTML = items.map(item => `
                     <button onclick="app.navigate('${item.id}')" 
-                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition ${this.currentView === item.id ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}">
-                        <i class="fas ${item.icon} w-5"></i>
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition font-medium ${this.currentView === item.id ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}">
+                        <i class="fas ${item.icon} w-5 text-center"></i>
                         <span>${item.label}</span>
                     </button>
                 `).join('');
@@ -259,72 +290,81 @@
                 content.innerHTML = '<div class="flex justify-center mt-10"><div class="loading border-blue-600 border-t-transparent w-10 h-10 border-4"></div></div>';
                 
                 try {
-                    // Roteamento
                     if (this.currentView === 'dashboard') await this.renderDashboard(content);
                     else if (this.currentView === 'materiais') await this.renderMateriais(content);
                     else if (this.currentView === 'provas') await this.renderProvas(content);
                     else if (this.currentView === 'turmas' && this.currentUserData.tipo === 'admin') await this.renderTurmas(content);
                     else if (this.currentView === 'professores' && this.currentUserData.tipo === 'admin') await this.renderProfessores(content);
                     else if (this.currentView === 'alunos') await this.renderAlunos(content);
-                    else content.innerHTML = '<div class="text-center text-gray-500">Acesso restrito ou não encontrado.</div>';
+                    else content.innerHTML = '<div class="text-center text-gray-500 dark:text-gray-400">Acesso restrito ou não encontrado.</div>';
                 } catch (error) {
                     console.error("Erro na renderização:", error);
-                    content.innerHTML = `<div class="text-center text-red-500">Erro ao carregar tela: ${error.message}</div>`;
+                    content.innerHTML = `<div class="text-center text-red-500 bg-red-100 p-4 rounded-lg">Erro ao carregar tela: ${error.message}</div>`;
                 }
             },
 
             // ==================== DASHBOARD ====================
             async renderDashboard(container) {
-                if (this.currentUserData.tipo !== 'aluno') {
-                    const turmas = (await this.getCollection('turmas'));
-                    let minhasTurmas = turmas;
-                    if(this.currentUserData.tipo === 'professor') {
-                         minhasTurmas = turmas.filter(t => t.professores && t.professores.includes(this.currentUserData.id));
-                    }
+                // Lógica unificada: Todos veem o dashboard
+                const turmas = await this.getCollection('turmas');
+                let minhasTurmas = turmas;
 
-                    container.innerHTML = `
-                        <div class="mb-6"><h2 class="text-2xl font-bold text-gray-800">Resultados e Diário</h2></div>
-                        ${minhasTurmas.length === 0 ? '<p class="text-gray-500">Nenhuma turma vinculada.</p>' : ''}
-                        ${minhasTurmas.map(t => `<div id="dash-turma-${t.id}" class="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-4"><div class="loading"></div></div>`).join('')}
-                    `;
-                    for (const t of minhasTurmas) this.renderTurmaResultados(t.id, t.nome);
-                } else {
-                    app.navigate('provas');
+                if(this.currentUserData.tipo === 'professor') {
+                     minhasTurmas = turmas.filter(t => t.professores && t.professores.includes(this.currentUserData.id));
+                } else if (this.currentUserData.tipo === 'aluno') {
+                    // Para o aluno, mostramos apenas as turmas onde ele está matriculado
+                    minhasTurmas = turmas.filter(t => t.alunos && t.alunos.includes(this.currentUserData.id));
                 }
+
+                container.innerHTML = `
+                    <div class="mb-6"><h2 class="text-2xl font-bold text-gray-800 dark:text-white">Dashboard - Resultados</h2></div>
+                    ${minhasTurmas.length === 0 ? '<p class="text-gray-500 dark:text-gray-400">Nenhuma turma encontrada.</p>' : ''}
+                    ${minhasTurmas.map(t => `<div id="dash-turma-${t.id}" class="mb-8 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-4"><div class="loading"></div></div>`).join('')}
+                `;
+                
+                for (const t of minhasTurmas) this.renderTurmaResultados(t.id, t.nome);
             },
 
             async renderTurmaResultados(turmaId, turmaNome) {
                 const provas = (await this.getCollection('provas')).filter(p => p.turmaId === turmaId);
-                const alunos = (await this.getCollection('users')).filter(u => u.tipo === 'aluno');
+                const users = await this.getCollection('users');
+                const alunos = users.filter(u => u.tipo === 'aluno');
+                
                 const turmaDoc = await db.collection('turmas').doc(turmaId).get();
-                const alunosDaTurmaIds = turmaDoc.data()?.alunos || [];
-                const alunosDaTurma = alunos.filter(a => alunosDaTurmaIds.includes(a.id));
+                const alunosIds = turmaDoc.data()?.alunos || [];
+                
+                // Se for aluno, mostra apenas ele mesmo na tabela para privacidade
+                let alunosDaTurma = alunos.filter(a => alunosIds.includes(a.id));
+                if (this.currentUserData.tipo === 'aluno') {
+                    alunosDaTurma = alunosDaTurma.filter(a => a.id === this.currentUserData.id);
+                }
+
                 const resultados = await this.getCollection('provas_resultados');
 
                 let html = `
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-lg text-blue-900">${turmaNome}</h3>
-                        <span class="text-sm text-gray-500">${provas.length} Provas | ${alunosDaTurma.length} Alunos</span>
+                        <h3 class="font-bold text-lg text-blue-900 dark:text-blue-400">${turmaNome}</h3>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">${provas.length} Provas</span>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm text-gray-600">
-                            <thead class="bg-gray-50 border-b">
+                        <table class="w-full text-left text-sm text-gray-600 dark:text-gray-300">
+                            <thead class="bg-gray-50 dark:bg-slate-700 border-b dark:border-slate-600">
                                 <tr>
                                     <th class="p-3">Aluno</th>
                                     ${provas.map(p => `<th class="p-3 text-center min-w-[120px]">${p.titulo}</th>`).join('')}
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100">
+                            <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
                                 ${alunosDaTurma.map(aluno => {
                                     return `
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="p-3 font-medium text-gray-900">${aluno.nome}</td>
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-slate-750">
+                                        <td class="p-3 font-medium text-gray-900 dark:text-white">${aluno.nome}</td>
                                         ${provas.map(p => {
                                             const res = resultados.find(r => r.provaId === p.id && r.alunoId === aluno.id);
-                                            if(!res) return `<td class="p-3 text-center text-gray-300">-</td>`;
+                                            if(!res) return `<td class="p-3 text-center text-gray-300 dark:text-gray-600">-</td>`;
                                             const nota = parseFloat(res.nota);
-                                            // Escala de 0 a 10: Maior que 6.0 é verde
-                                            const color = nota >= 6.0 ? 'text-green-600' : 'text-red-600';
+                                            // Nota 0-10: Verde >= 6.0
+                                            const color = nota >= 6.0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
                                             return `<td class="p-3 text-center font-bold ${color}">${nota.toFixed(1)}</td>`;
                                         }).join('')}
                                     </tr>`;
@@ -332,16 +372,17 @@
                             </tbody>
                         </table>
                     </div>
+                    ${this.currentUserData.tipo !== 'aluno' ? `
                     <div class="mt-4 flex gap-2 justify-end">
                         <button onclick="app.exportarResultadosExcel('${turmaId}')" class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
                             <i class="fas fa-file-excel mr-1"></i> Exportar Diário
                         </button>
-                    </div>
+                    </div>` : ''}
                 `;
                 document.getElementById(`dash-turma-${turmaId}`).innerHTML = html;
             },
 
-            // ==================== ALUNOS & IMPORTAÇÃO EXCEL ====================
+            // ==================== ALUNOS & IMPORTAÇÃO ====================
             async renderAlunos(container) {
                 const turmas = await this.getCollection('turmas');
                 let alunos = (await this.getCollection('users')).filter(u => u.tipo === 'aluno');
@@ -352,24 +393,24 @@
                 }
 
                 container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Gerenciar Alunos</h2>
-                        <div class="flex gap-2">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Gerenciar Alunos</h2>
+                        <div class="flex flex-wrap gap-2">
                             ${this.currentUserData.tipo === 'admin' ? `
-                                <button onclick="app.baixarModeloAluno()" class="px-3 py-2 text-blue-600 text-sm hover:underline">Modelo CSV/Excel</button>
-                                <label class="cursor-pointer px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
-                                    <i class="fas fa-file-excel mr-2"></i> Importar Excel
+                                <button onclick="app.baixarModeloAluno()" class="px-3 py-2 text-blue-600 dark:text-blue-400 text-sm hover:underline">Modelo Excel</button>
+                                <label class="cursor-pointer px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center shadow-sm">
+                                    <i class="fas fa-file-excel mr-2"></i> Importar
                                     <input type="file" hidden accept=".xlsx, .xls" onchange="app.importarAlunosExcel(this)">
                                 </label>
                             ` : ''}
-                            <button onclick="app.modalAluno()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
+                            <button onclick="app.modalAluno()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 shadow-sm">
                                 <i class="fas fa-plus mr-2"></i>Novo Aluno
                             </button>
                         </div>
                     </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <table class="w-full text-left text-sm text-gray-600">
-                            <thead class="bg-gray-50 text-gray-800 border-b">
+                    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+                        <table class="w-full text-left text-sm text-gray-600 dark:text-gray-300">
+                            <thead class="bg-gray-50 dark:bg-slate-700 text-gray-800 dark:text-white border-b dark:border-slate-600">
                                 <tr>
                                     <th class="p-4">Nome</th>
                                     <th class="p-4">Email</th>
@@ -377,17 +418,17 @@
                                     <th class="p-4 text-right">Ações</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100">
+                            <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
                                 ${alunos.map(a => {
                                     const turmasAluno = turmas.filter(t => t.alunos && t.alunos.includes(a.id)).map(t => t.nome).join(', ');
                                     return `
-                                    <tr class="hover:bg-gray-50 group">
-                                        <td class="p-4 font-medium text-gray-900">${a.nome}</td>
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-slate-750">
+                                        <td class="p-4 font-medium text-gray-900 dark:text-white">${a.nome}</td>
                                         <td class="p-4">${a.email}</td>
                                         <td class="p-4"><span class="badge badge-blue">${turmasAluno || 'Nenhuma'}</span></td>
                                         <td class="p-4 text-right">
-                                            <button onclick="app.modalAluno('${a.id}')" class="text-blue-600 hover:text-blue-800 mr-3"><i class="fas fa-edit"></i></button>
-                                            ${this.currentUserData.tipo === 'admin' ? `<button onclick="app.deleteUsuario('${a.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>` : ''}
+                                            <button onclick="app.modalAluno('${a.id}')" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 mr-3"><i class="fas fa-edit"></i></button>
+                                            ${this.currentUserData.tipo === 'admin' ? `<button onclick="app.deleteUsuario('${a.id}')" class="text-red-500 dark:text-red-400 hover:text-red-700"><i class="fas fa-trash"></i></button>` : ''}
                                         </td>
                                     </tr>`;
                                 }).join('')}
@@ -398,7 +439,7 @@
             },
 
             baixarModeloAluno() {
-                const ws = XLSX.utils.json_to_sheet([{ Nome: "João Silva", Email: "joao@email.com", Senha: "123456" }]);
+                const ws = XLSX.utils.json_to_sheet([{ Nome: "João Silva", Email: "joao@email.com" }]);
                 const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Modelo_Alunos");
                 XLSX.writeFile(wb, "Modelo_Importacao_Alunos.xlsx");
             },
@@ -415,23 +456,15 @@
                         let count = 0;
                         for(const row of jsonData) {
                             if(row.Nome && row.Email) {
-                                // Adiciona direto ao Firestore para aparecer na lista.
-                                // NOTA: Em um app real, precisaria criar no Auth via Admin SDK para eles logarem.
-                                // Aqui simulamos adicionando ao banco de dados de usuários.
                                 await db.collection('users').add({
-                                    nome: row.Nome,
-                                    email: row.Email,
-                                    tipo: 'aluno',
-                                    criado: firebase.firestore.FieldValue.serverTimestamp()
+                                    nome: row.Nome, email: row.Email, tipo: 'aluno', criado: firebase.firestore.FieldValue.serverTimestamp()
                                 });
                                 count++;
                             }
                         }
-                        alert(`${count} alunos importados com sucesso! Nota: Para eles fazerem login real, é necessário criar as credenciais no Auth manualmente ou via backend.`);
+                        alert(`${count} alunos importados! (Crie as senhas no Authentication manualmente)`);
                         this.renderContent();
-                    } catch (err) {
-                        alert("Erro ao importar: " + err.message);
-                    }
+                    } catch (err) { alert("Erro ao importar: " + err.message); }
                 };
                 reader.readAsArrayBuffer(file);
             },
@@ -443,10 +476,10 @@
                 
                 const content = `
                     <div class="space-y-3">
-                        ${!id ? `<div><label class="block text-sm font-medium mb-1">Email</label><input type="email" id="alu-email" class="w-full px-4 py-2 border rounded-lg"></div>
-                        <div><label class="block text-sm font-medium mb-1">Senha</label><input type="password" id="alu-pass" class="w-full px-4 py-2 border rounded-lg"></div>` : ''}
-                        <div><label class="block text-sm font-medium mb-1">Nome</label><input type="text" id="alu-nome" value="${aluno ? aluno.nome : ''}" class="w-full px-4 py-2 border rounded-lg"></div>
-                        <div><label class="block text-sm font-medium mb-1">Turmas</label><div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50">${turmas.map(t => `<label class="flex items-center space-x-2 p-1 hover:bg-gray-200 rounded cursor-pointer"><input type="checkbox" class="turma-check" value="${t.id}" ${turmasDoAluno.includes(t.id) ? 'checked' : ''}><span>${t.nome}</span></label>`).join('')}</div></div>
+                        ${!id ? `<div><label class="block text-sm font-medium mb-1">Email</label><input type="email" id="alu-email" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div>
+                        <div><label class="block text-sm font-medium mb-1">Senha</label><input type="password" id="alu-pass" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div>` : ''}
+                        <div><label class="block text-sm font-medium mb-1">Nome</label><input type="text" id="alu-nome" value="${aluno ? aluno.nome : ''}" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div>
+                        <div><label class="block text-sm font-medium mb-1">Turmas</label><div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50 dark:bg-slate-700 dark:border-slate-600">${turmas.map(t => `<label class="flex items-center space-x-2 p-1 hover:bg-gray-200 dark:hover:bg-slate-600 rounded cursor-pointer"><input type="checkbox" class="turma-check" value="${t.id}" ${turmasDoAluno.includes(t.id) ? 'checked' : ''}><span>${t.nome}</span></label>`).join('')}</div></div>
                     </div>
                 `;
                 this.showModal(id ? 'Editar Aluno' : 'Novo Aluno', content, async () => {
@@ -458,7 +491,7 @@
                         if (!email || !pass || !nome) return alert('Preencha tudo');
                         uid = db.collection('users').doc().id;
                         await db.collection('users').doc(uid).set({ nome, email, tipo: 'aluno', criado: firebase.firestore.FieldValue.serverTimestamp() });
-                        alert('Aluno criado no banco (Auth precisa de backend).');
+                        alert('Aluno criado (backend simulado).');
                     } else await db.collection('users').doc(uid).update({ nome });
                     
                     const todasTurmas = await this.getCollection('turmas');
@@ -468,7 +501,7 @@
                 });
             },
 
-            // ==================== MATERIAIS ====================
+            // ==================== MATERIAIS (SÓ LINKS) ====================
             async renderMateriais(container) {
                 const turmas = await this.getCollection('turmas');
                 let materiais = await this.getCollection('materiais');
@@ -483,16 +516,28 @@
 
                 container.innerHTML = `
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Materiais Didáticos</h2>
-                        <button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Materiais Didáticos</h2>
+                        <button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 shadow-sm">
                             <i class="fas fa-plus mr-2"></i>Adicionar Material
                         </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         ${materiais.map(m => {
-                            let icon = m.tipo === 'youtube' ? 'fa-youtube text-red-600' : (m.tipo === 'link' ? 'fa-link text-green-600' : 'fa-file-alt text-blue-600');
+                            let icon = m.tipo === 'youtube' ? 'fa-youtube text-red-600' : 'fa-link text-blue-600';
                             const canEdit = this.currentUserData.tipo === 'admin' || this.currentUserData.tipo === 'professor' || (this.currentUserData.tipo === 'aluno' && m.professorId === this.currentUserData.id);
-                            return `<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover relative group">${canEdit ? `<div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition bg-white p-1"><button onclick="app.showAddMaterialModal('${m.id}')" class="text-blue-600 mx-1"><i class="fas fa-edit"></i></button><button onclick="app.deleteItem('materiais', '${m.id}')" class="text-red-500 mx-1"><i class="fas fa-trash"></i></button></div>` : ''}<div class="flex items-start gap-4 mb-4"><div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0"><i class="fas ${icon} text-xl"></i></div><div class="flex-1 min-w-0"><h3 class="font-bold text-gray-900 truncate">${m.titulo}</h3><p class="text-xs text-gray-500 mt-1">${m.turmaNome || 'Geral'}</p></div></div><a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 text-blue-700 text-center rounded-lg hover:bg-blue-100 text-sm font-medium">Acessar</a></div>`;
+                            return `<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-slate-700 card-hover relative group">
+                                ${canEdit ? `<div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition bg-white dark:bg-slate-700 p-1 rounded border dark:border-slate-600"><button onclick="app.showAddMaterialModal('${m.id}')" class="text-blue-600 dark:text-blue-400 mx-1"><i class="fas fa-edit"></i></button><button onclick="app.deleteItem('materiais', '${m.id}')" class="text-red-500 dark:text-red-400 mx-1"><i class="fas fa-trash"></i></button></div>` : ''}
+                                <div class="flex items-start gap-4 mb-4">
+                                    <div class="w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas ${icon} text-xl"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="font-bold text-gray-900 dark:text-white truncate">${m.titulo}</h3>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${m.turmaNome || 'Geral'}</p>
+                                    </div>
+                                </div>
+                                <a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 text-center rounded-lg hover:bg-blue-100 dark:hover:bg-slate-600 text-sm font-medium">Acessar</a>
+                            </div>`;
                         }).join('')}
                     </div>
                 `;
@@ -506,52 +551,59 @@
                 
                 const options = turmasPermitidas.map(t => `<option value="${t.id}" data-nome="${t.nome}" ${material && material.turmaId === t.id ? 'selected' : ''}>${t.nome}</option>`).join('');
                 
-                const content = `<div class="space-y-4"><div><label class="block text-sm font-medium mb-1">Título</label><input type="text" id="mat-titulo" value="${material ? material.titulo : ''}" class="w-full px-4 py-2 border rounded-lg"></div><div><label class="block text-sm font-medium mb-1">Turma</label><select id="mat-turma" class="w-full px-4 py-2 border rounded-lg"><option value="">Selecione...</option>${options}</select></div>${!editId ? `<div><label class="block text-sm font-medium mb-1">Tipo</label><div class="flex gap-2"><button type="button" onclick="app.toggleMatType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm">Arquivo</button><button type="button" onclick="app.toggleMatType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm">Link</button></div></div><div id="area-arquivo" class="mt-2"><input type="file" id="mat-file" class="w-full text-sm text-gray-500"></div><div id="area-link" class="hidden mt-2"><input type="url" id="mat-url" placeholder="https://..." class="w-full px-4 py-2 border rounded-lg"></div>` : ''}</div>`;
+                // Removido upload de arquivos, apenas Link
+                const content = `
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Título</label>
+                            <input type="text" id="mat-titulo" value="${material ? material.titulo : ''}" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Turma</label>
+                            <select id="mat-turma" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                                <option value="">Selecione...</option>${options}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Link (URL, Youtube, Drive)</label>
+                            <input type="url" id="mat-url" value="${material ? material.url : ''}" placeholder="https://..." class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                            <p class="text-xs text-gray-400 mt-1">Cole o link do Google Drive, Youtube ou Documento.</p>
+                        </div>
+                    </div>`;
                 
                 this.showModal(editId ? 'Editar Material' : 'Novo Material', content, async () => {
                     const titulo = document.getElementById('mat-titulo').value;
                     const select = document.getElementById('mat-turma');
+                    const url = document.getElementById('mat-url').value;
                     const turmaId = select.value;
                     const turmaNome = select.options[select.selectedIndex]?.dataset.nome;
-                    if (!titulo || !turmaId) throw new Error('Preencha título e turma');
                     
-                    const data = { titulo, turmaId, turmaNome };
-                    if (editId) { await db.collection('materiais').doc(editId).update(data); } else {
-                        const tipo = this.currentMaterialType;
-                        let url = '';
-                        if (tipo === 'link') { url = document.getElementById('mat-url').value; data.tipo = url.includes('youtu') ? 'youtube' : 'link'; } 
-                        else { const file = document.getElementById('mat-file').files[0]; if (!file) throw new Error('Selecione arquivo'); const ref = storage.ref().child(`materiais/${Date.now()}_${file.name}`); await ref.put(file); url = await ref.getDownloadURL(); data.tipo = file.name.split('.').pop(); }
-                        data.url = url; data.professorId = this.currentUserData.id; data.professorNome = this.currentUserData.nome; data.criado = firebase.firestore.FieldValue.serverTimestamp();
+                    if (!titulo || !turmaId || !url) throw new Error('Preencha todos os campos.');
+                    
+                    const tipo = url.includes('youtu') ? 'youtube' : 'link';
+                    const data = { titulo, turmaId, turmaNome, url, tipo };
+
+                    if (editId) { await db.collection('materiais').doc(editId).update(data); } 
+                    else {
+                        data.professorId = this.currentUserData.id; 
+                        data.professorNome = this.currentUserData.nome; 
+                        data.criado = firebase.firestore.FieldValue.serverTimestamp();
                         await db.collection('materiais').add(data);
                     }
                     this.renderContent();
                 });
             },
 
-            toggleMatType(type) {
-                this.currentMaterialType = type;
-                if(type === 'arquivo') {
-                    document.getElementById('area-arquivo').classList.remove('hidden'); document.getElementById('area-link').classList.add('hidden');
-                    document.getElementById('btn-arquivo').className = 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm';
-                    document.getElementById('btn-link').className = 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm';
-                } else {
-                    document.getElementById('area-arquivo').classList.add('hidden'); document.getElementById('area-link').classList.remove('hidden');
-                    document.getElementById('btn-link').className = 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm';
-                    document.getElementById('btn-arquivo').className = 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm';
-                }
-            },
-
             // ==================== TURMAS & PROFESSORES (ADMIN) ====================
             async renderTurmas(container) {
                 const turmas = await this.getCollection('turmas');
-                const professores = (await this.getCollection('users')).filter(u => u.tipo === 'professor');
-                container.innerHTML = `<div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800">Gerenciar Turmas</h2><button onclick="app.modalTurma()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">Nova Turma</button></div><div class="grid grid-cols-1 md:grid-cols-3 gap-4">${turmas.map(t => `<div class="bg-white p-6 rounded shadow relative group"><div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100"><button onclick="app.modalTurma('${t.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="app.deleteItem('turmas', '${t.id}')" class="text-red-500"><i class="fas fa-trash"></i></button></div><h3 class="font-bold">${t.nome}</h3><p class="text-sm text-gray-500">${t.alunos?.length||0} Alunos</p></div>`).join('')}</div>`;
+                container.innerHTML = `<div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800 dark:text-white">Gerenciar Turmas</h2><button onclick="app.modalTurma()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">Nova Turma</button></div><div class="grid grid-cols-1 md:grid-cols-3 gap-4">${turmas.map(t => `<div class="bg-white dark:bg-slate-800 p-6 rounded shadow relative group border dark:border-slate-700"><div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100"><button onclick="app.modalTurma('${t.id}')" class="text-blue-600 dark:text-blue-400 mr-2"><i class="fas fa-edit"></i></button><button onclick="app.deleteItem('turmas', '${t.id}')" class="text-red-500 dark:text-red-400"><i class="fas fa-trash"></i></button></div><h3 class="font-bold dark:text-white">${t.nome}</h3><p class="text-sm text-gray-500 dark:text-gray-400">${t.alunos?.length||0} Alunos</p></div>`).join('')}</div>`;
             },
             
             async modalTurma(id = null) {
                 const professores = (await this.getCollection('users')).filter(u => u.tipo === 'professor');
                 let turma = null; if (id) { const doc = await db.collection('turmas').doc(id).get(); turma = { id: doc.id, ...doc.data() }; }
-                const content = `<div><label class="block text-sm mb-1">Nome</label><input type="text" id="turma-nome" value="${turma?turma.nome:''}" class="w-full px-3 py-2 border rounded mb-3"><label class="block text-sm mb-1">Professores</label><div class="h-32 overflow-y-auto border p-2 bg-gray-50">${professores.map(p => `<label class="flex items-center gap-2 p-1"><input type="checkbox" class="prof-check" value="${p.id}" ${turma?.professores?.includes(p.id)?'checked':''}>${p.nome}</label>`).join('')}</div></div>`;
+                const content = `<div><label class="block text-sm mb-1">Nome</label><input type="text" id="turma-nome" value="${turma?turma.nome:''}" class="w-full px-3 py-2 border rounded mb-3 dark:bg-slate-700 dark:border-slate-600 dark:text-white"><label class="block text-sm mb-1">Professores</label><div class="h-32 overflow-y-auto border p-2 bg-gray-50 dark:bg-slate-700 dark:border-slate-600">${professores.map(p => `<label class="flex items-center gap-2 p-1 dark:text-gray-300"><input type="checkbox" class="prof-check" value="${p.id}" ${turma?.professores?.includes(p.id)?'checked':''}>${p.nome}</label>`).join('')}</div></div>`;
                 this.showModal(id?'Editar':'Nova', content, async()=>{
                     const nome = document.getElementById('turma-nome').value;
                     const profs = Array.from(document.querySelectorAll('.prof-check:checked')).map(c=>c.value);
@@ -565,12 +617,12 @@
 
             async renderProfessores(container) {
                 const profs = (await this.getCollection('users')).filter(u => u.tipo === 'professor');
-                container.innerHTML = `<div class="flex justify-between mb-6"><h2 class="text-2xl font-bold">Gerenciar Professores</h2><button onclick="app.modalProfessor()" class="bg-blue-700 text-white px-4 py-2 rounded">Novo</button></div><div class="bg-white rounded shadow overflow-hidden"><table class="w-full text-left p-4"><thead class="bg-gray-50 border-b"><tr><th class="p-4">Nome</th><th class="p-4">Email</th><th class="p-4 text-right">Ações</th></tr></thead><tbody>${profs.map(p => `<tr><td class="p-4">${p.nome}</td><td class="p-4">${p.email}</td><td class="p-4 text-right"><button onclick="app.modalProfessor('${p.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="app.deleteUsuario('${p.id}')" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>`;
+                container.innerHTML = `<div class="flex justify-between mb-6"><h2 class="text-2xl font-bold text-gray-800 dark:text-white">Gerenciar Professores</h2><button onclick="app.modalProfessor()" class="bg-blue-700 text-white px-4 py-2 rounded">Novo</button></div><div class="bg-white dark:bg-slate-800 rounded shadow overflow-hidden"><table class="w-full text-left p-4"><thead class="bg-gray-50 dark:bg-slate-700 border-b dark:border-slate-600"><tr><th class="p-4">Nome</th><th class="p-4">Email</th><th class="p-4 text-right">Ações</th></tr></thead><tbody class="dark:text-gray-300">${profs.map(p => `<tr><td class="p-4">${p.nome}</td><td class="p-4">${p.email}</td><td class="p-4 text-right"><button onclick="app.modalProfessor('${p.id}')" class="text-blue-600 dark:text-blue-400 mr-2"><i class="fas fa-edit"></i></button><button onclick="app.deleteUsuario('${p.id}')" class="text-red-500 dark:text-red-400"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>`;
             },
 
             async modalProfessor(id = null) {
                 let prof = null; if(id) { const d=await db.collection('users').doc(id).get(); prof={id:d.id, ...d.data()}; }
-                const content = `<div class="space-y-3">${!id ? `<div><label>Email</label><input id="p-email" class="w-full border p-2 rounded"></div><div><label>Senha</label><input id="p-pass" type="password" class="w-full border p-2 rounded"></div>`:''}<div><label>Nome</label><input id="p-nome" value="${prof?prof.nome:''}" class="w-full border p-2 rounded"></div></div>`;
+                const content = `<div class="space-y-3">${!id ? `<div><label>Email</label><input id="p-email" class="w-full border p-2 rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div><div><label>Senha</label><input id="p-pass" type="password" class="w-full border p-2 rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div>`:''}<div><label>Nome</label><input id="p-nome" value="${prof?prof.nome:''}" class="w-full border p-2 rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div></div>`;
                 this.showModal(id?'Editar':'Novo', content, async()=>{
                     const nome = document.getElementById('p-nome').value;
                     if(!id) {
@@ -592,8 +644,8 @@
                     if (this.currentUserData.tipo === 'professor') displayProvas = provas.filter(p => p.professorId === this.currentUserData.id);
 
                     container.innerHTML = `
-                        <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800">Gestão de Provas</h2><button onclick="app.modalCriarProva()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800"><i class="fas fa-plus mr-2"></i>Criar Prova</button></div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${displayProvas.map(p => { const turma = turmas.find(t => t.id === p.turmaId)?.nome || 'Turma Desconhecida'; return `<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 relative group"><div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition flex gap-1"><button onclick="app.exportarGabarito('${p.id}')" title="Gabarito" class="text-green-600 hover:text-green-800 p-1"><i class="fas fa-key"></i></button><button onclick="app.deleteItem('provas', '${p.id}')" title="Excluir" class="text-red-500 hover:text-red-700 p-1"><i class="fas fa-trash"></i></button></div><h3 class="font-bold text-lg text-gray-900 truncate">${p.titulo}</h3><p class="text-sm text-gray-500 mb-2">${turma}</p><div class="text-xs text-gray-400 space-y-1"><p><i class="far fa-clock"></i> ${p.inicio ? new Date(p.inicio).toLocaleString() : 'Livre'}</p><p><i class="fas fa-list-ol"></i> ${p.questoes.length} Questões</p></div></div>`; }).join('')}</div>
+                        <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800 dark:text-white">Gestão de Provas</h2><button onclick="app.modalCriarProva()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800"><i class="fas fa-plus mr-2"></i>Criar Prova</button></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${displayProvas.map(p => { const turma = turmas.find(t => t.id === p.turmaId)?.nome || 'Turma Desconhecida'; return `<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-slate-700 relative group"><div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition flex gap-1"><button onclick="app.exportarGabarito('${p.id}')" title="Gabarito" class="text-green-600 dark:text-green-400 hover:text-green-800 p-1"><i class="fas fa-key"></i></button><button onclick="app.deleteItem('provas', '${p.id}')" title="Excluir" class="text-red-500 dark:text-red-400 hover:text-red-700 p-1"><i class="fas fa-trash"></i></button></div><h3 class="font-bold text-lg text-gray-900 dark:text-white truncate">${p.titulo}</h3><p class="text-sm text-gray-500 dark:text-gray-400 mb-2">${turma}</p><div class="text-xs text-gray-400 space-y-1"><p><i class="far fa-clock"></i> ${p.inicio ? new Date(p.inicio).toLocaleString() : 'Livre'}</p><p><i class="fas fa-list-ol"></i> ${p.questoes.length} Questões</p></div></div>`; }).join('')}</div>
                     `;
                 } else {
                     const turmas = await this.getCollection('turmas');
@@ -601,14 +653,14 @@
                     const provas = (await this.getCollection('provas')).filter(p => minhasTurmasIds.includes(p.turmaId));
                     const resultados = (await this.getCollection('provas_resultados')).filter(r => r.alunoId === this.currentUserData.id);
 
-                    container.innerHTML = `<h2 class="text-2xl font-bold mb-6 text-gray-800">Provas Disponíveis</h2><div class="space-y-4">${provas.map(p => {
+                    container.innerHTML = `<h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-white">Provas Disponíveis</h2><div class="space-y-4">${provas.map(p => {
                         const jaFez = resultados.find(r => r.provaId === p.id);
                         const agora = new Date(); const inicio = p.inicio ? new Date(p.inicio) : null; const fim = p.fim ? new Date(p.fim) : null;
                         let status = 'disponivel'; let msg = 'Realizar Prova'; let btnClass = 'bg-blue-600 text-white hover:bg-blue-700';
-                        if (jaFez) { status = 'concluida'; msg = `Nota ${jaFez.nota}`; btnClass = 'bg-green-100 text-green-700 cursor-default'; } 
-                        else if (inicio && agora < inicio) { status = 'aguardando'; msg = `Abre em ${inicio.toLocaleString()}`; btnClass = 'bg-gray-100 text-gray-500 cursor-not-allowed'; } 
-                        else if (fim && agora > fim) { status = 'encerrada'; msg = 'Encerrada'; btnClass = 'bg-red-50 text-red-500 cursor-not-allowed'; }
-                        return `<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4"><div><h3 class="font-bold text-lg">${p.titulo}</h3><p class="text-sm text-gray-500">${p.questoes.length} Questões</p></div><button onclick="${status === 'disponivel' ? `app.iniciarProva('${p.id}')` : ''}" class="px-6 py-2 rounded-lg font-medium transition ${btnClass}" ${status !== 'disponivel' ? 'disabled' : ''}>${msg}</button></div>`;
+                        if (jaFez) { status = 'concluida'; msg = `Nota ${jaFez.nota}`; btnClass = 'bg-green-100 text-green-700 cursor-default dark:bg-green-900 dark:text-green-200'; } 
+                        else if (inicio && agora < inicio) { status = 'aguardando'; msg = `Abre em ${inicio.toLocaleString()}`; btnClass = 'bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-400'; } 
+                        else if (fim && agora > fim) { status = 'encerrada'; msg = 'Encerrada'; btnClass = 'bg-red-50 text-red-500 cursor-not-allowed dark:bg-red-900 dark:text-red-200'; }
+                        return `<div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4"><div><h3 class="font-bold text-lg dark:text-white">${p.titulo}</h3><p class="text-sm text-gray-500 dark:text-gray-400">${p.questoes.length} Questões</p></div><button onclick="${status === 'disponivel' ? `app.iniciarProva('${p.id}')` : ''}" class="px-6 py-2 rounded-lg font-medium transition ${btnClass}" ${status !== 'disponivel' ? 'disabled' : ''}>${msg}</button></div>`;
                     }).join('')}</div>`;
                 }
             },
@@ -620,8 +672,8 @@
                 if(this.currentUserData.tipo === 'professor') turmasOpts = turmas.filter(t => t.professores?.includes(this.currentUserData.id));
 
                 const content = `
-                    <div class="space-y-4"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2"><label class="block text-sm font-medium mb-1">Título da Prova</label><input type="text" id="prova-titulo" class="w-full px-3 py-2 border rounded-lg"></div><div><label class="block text-sm font-medium mb-1">Turma</label><select id="prova-turma" class="w-full px-3 py-2 border rounded-lg"><option value="">Selecione...</option>${turmasOpts.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}</select></div><div><label class="block text-sm font-medium mb-1">Início</label><input type="datetime-local" id="prova-inicio" class="w-full px-3 py-2 border rounded-lg"></div><div><label class="block text-sm font-medium mb-1">Fim</label><input type="datetime-local" id="prova-fim" class="w-full px-3 py-2 border rounded-lg"></div></div>
-                        <div class="border-t pt-4"><h4 class="font-bold text-gray-700 mb-2">Questões</h4><div class="flex gap-2 mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100 items-center"><div class="flex-1"><p class="text-sm text-blue-800 font-medium">Importar do Excel</p><p class="text-xs text-blue-600">Colunas: Pergunta, OpcaoA, OpcaoB, OpcaoC, OpcaoD, Correta (A,B,C,D), Tempo (min)</p></div><button onclick="app.baixarModeloExcel()" class="text-xs underline text-blue-600 mr-2">Baixar Modelo</button><label class="cursor-pointer bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Selecionar Arquivo<input type="file" id="excel-file" class="hidden" accept=".xlsx, .xls" onchange="app.lerExcel(this)"></label></div><div id="lista-questoes" class="space-y-2 max-h-60 overflow-y-auto mb-2"><p class="text-sm text-gray-400 text-center italic" id="empty-msg">Nenhuma questão adicionada.</p></div></div></div>
+                    <div class="space-y-4"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2"><label class="block text-sm font-medium mb-1">Título da Prova</label><input type="text" id="prova-titulo" class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div><div><label class="block text-sm font-medium mb-1">Turma</label><select id="prova-turma" class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"><option value="">Selecione...</option>${turmasOpts.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}</select></div><div><label class="block text-sm font-medium mb-1">Início</label><input type="datetime-local" id="prova-inicio" class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div><div><label class="block text-sm font-medium mb-1">Fim</label><input type="datetime-local" id="prova-fim" class="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"></div></div>
+                        <div class="border-t pt-4 dark:border-slate-600"><h4 class="font-bold text-gray-700 dark:text-white mb-2">Questões</h4><div class="flex gap-2 mb-4 bg-blue-50 dark:bg-slate-700 p-3 rounded-lg border border-blue-100 dark:border-slate-600 items-center"><div class="flex-1"><p class="text-sm text-blue-800 dark:text-blue-300 font-medium">Importar do Excel</p><p class="text-xs text-blue-600 dark:text-blue-400">Colunas: Pergunta, OpcaoA, OpcaoB, OpcaoC, OpcaoD, Correta (A,B,C,D), Tempo (min)</p></div><button onclick="app.baixarModeloExcel()" class="text-xs underline text-blue-600 dark:text-blue-400 mr-2">Baixar Modelo</button><label class="cursor-pointer bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Selecionar Arquivo<input type="file" id="excel-file" class="hidden" accept=".xlsx, .xls" onchange="app.lerExcel(this)"></label></div><div id="lista-questoes" class="space-y-2 max-h-60 overflow-y-auto mb-2"><p class="text-sm text-gray-400 text-center italic" id="empty-msg">Nenhuma questão adicionada.</p></div></div></div>
                 `;
 
                 this.showModal('Nova Prova', content, async () => {
@@ -659,15 +711,13 @@
             atualizarListaQuestoesUI() {
                 const container = document.getElementById('lista-questoes');
                 const emptyMsg = document.getElementById('empty-msg'); if(this.tempQuestoes.length > 0 && emptyMsg) emptyMsg.remove();
-                container.innerHTML = this.tempQuestoes.map((q, i) => `<div class="bg-gray-50 p-2 rounded border border-gray-200 text-sm flex justify-between items-center"><div class="truncate flex-1 font-medium">${i+1}. ${q.pergunta}</div><div class="text-xs text-gray-500 mr-2">${q.tempo} min</div><button onclick="app.removerQuestao(${i})" class="text-red-500"><i class="fas fa-times"></i></button></div>`).join('');
+                container.innerHTML = this.tempQuestoes.map((q, i) => `<div class="bg-gray-50 dark:bg-slate-700 p-2 rounded border border-gray-200 dark:border-slate-600 text-sm flex justify-between items-center"><div class="truncate flex-1 font-medium dark:text-white">${i+1}. ${q.pergunta}</div><div class="text-xs text-gray-500 mr-2 dark:text-gray-400">${q.tempo} min</div><button onclick="app.removerQuestao(${i})" class="text-red-500 dark:text-red-400"><i class="fas fa-times"></i></button></div>`).join('');
             },
 
             removerQuestao(index) { this.tempQuestoes.splice(index, 1); this.atualizarListaQuestoesUI(); },
 
             async iniciarProva(provaId) {
-                // Captura do inicio da prova para calculo no Excel depois
                 const dataInicioReal = new Date(); 
-                
                 const doc = await db.collection('provas').doc(provaId).get();
                 const prova = { id: doc.id, ...doc.data() };
                 let questaoAtualIdx = 0; let respostas = {}; let tempoRestante = 0; let timerInterval = null;
@@ -675,7 +725,7 @@
                 const renderQuestao = () => {
                     const q = prova.questoes[questaoAtualIdx];
                     if(!timerInterval) { tempoRestante = (q.tempo || 2) * 60; iniciarTimer(); }
-                    document.getElementById('content-area').innerHTML = `<div class="max-w-2xl mx-auto"><div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold">${prova.titulo}</h2><div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-mono text-lg font-bold" id="timer-display">00:00</div></div><div class="bg-white rounded-xl shadow-lg p-8"><div class="mb-6"><span class="text-sm text-gray-400 uppercase tracking-wide">Questão ${questaoAtualIdx + 1} de ${prova.questoes.length}</span><h3 class="text-xl font-medium mt-2 text-gray-800">${q.pergunta}</h3></div><div class="space-y-3 mb-8">${['A','B','C','D'].map((opt, i) => `<label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-blue-50 transition ${respostas[questaoAtualIdx] === opt ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'border-gray-200'}"><input type="radio" name="opcao" value="${opt}" class="hidden" onchange="document.querySelectorAll('label').forEach(l=>l.classList.remove('bg-blue-50','border-blue-500','ring-1')); this.parentElement.classList.add('bg-blue-50','border-blue-500','ring-1'); window.setResp('${opt}')" ${respostas[questaoAtualIdx] === opt ? 'checked' : ''}><span class="w-8 h-8 rounded-full bg-white border border-gray-300 flex items-center justify-center mr-3 font-bold text-gray-500 text-sm">${opt}</span><span class="text-gray-700">${q.opcoes[i]}</span></label>`).join('')}</div><div class="flex justify-between"><button class="px-4 py-2 text-gray-400" disabled>Tempo por questão</button><button onclick="window.proxQuestao()" class="px-6 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">${questaoAtualIdx === prova.questoes.length - 1 ? 'Finalizar Prova' : 'Próxima'} <i class="fas fa-arrow-right ml-2"></i></button></div></div></div>`;
+                    document.getElementById('content-area').innerHTML = `<div class="max-w-2xl mx-auto"><div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold dark:text-white">${prova.titulo}</h2><div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-mono text-lg font-bold" id="timer-display">00:00</div></div><div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-8"><div class="mb-6"><span class="text-sm text-gray-400 uppercase tracking-wide">Questão ${questaoAtualIdx + 1} de ${prova.questoes.length}</span><h3 class="text-xl font-medium mt-2 text-gray-800 dark:text-white">${q.pergunta}</h3></div><div class="space-y-3 mb-8">${['A','B','C','D'].map((opt, i) => `<label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 transition ${respostas[questaoAtualIdx] === opt ? 'bg-blue-50 dark:bg-slate-700 border-blue-500 ring-1 ring-blue-500' : 'border-gray-200 dark:border-slate-600'}"><input type="radio" name="opcao" value="${opt}" class="hidden" onchange="document.querySelectorAll('label').forEach(l=>l.classList.remove('bg-blue-50','border-blue-500','ring-1','dark:bg-slate-700')); this.parentElement.classList.add('bg-blue-50','dark:bg-slate-700','border-blue-500','ring-1'); window.setResp('${opt}')" ${respostas[questaoAtualIdx] === opt ? 'checked' : ''}><span class="w-8 h-8 rounded-full bg-white dark:bg-slate-600 border border-gray-300 dark:border-slate-500 flex items-center justify-center mr-3 font-bold text-gray-500 dark:text-white text-sm">${opt}</span><span class="text-gray-700 dark:text-gray-300">${q.opcoes[i]}</span></label>`).join('')}</div><div class="flex justify-between"><button class="px-4 py-2 text-gray-400" disabled>Tempo por questão</button><button onclick="window.proxQuestao()" class="px-6 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">${questaoAtualIdx === prova.questoes.length - 1 ? 'Finalizar Prova' : 'Próxima'} <i class="fas fa-arrow-right ml-2"></i></button></div></div></div>`;
                 };
                 const iniciarTimer = () => {
                     clearInterval(timerInterval);
@@ -690,19 +740,16 @@
                     clearInterval(timerInterval); timerInterval = null;
                     if (questaoAtualIdx < prova.questoes.length - 1) { questaoAtualIdx++; renderQuestao(); } else {
                         let acertos = 0; prova.questoes.forEach((q, i) => { if (respostas[i] === q.correta) acertos++; });
-                        
-                        // CÁLCULO DA NOTA DE 0 A 10
                         const notaFinal = (acertos / prova.questoes.length) * 10;
-                        
                         await db.collection('provas_resultados').add({ 
                             provaId: prova.id, 
                             alunoId: this.currentUserData.id, 
                             respostas, 
-                            nota: notaFinal.toFixed(1), // Ex: "8.5"
+                            nota: notaFinal.toFixed(1),
                             dataInicio: dataInicioReal, 
                             dataFim: firebase.firestore.FieldValue.serverTimestamp() 
                         });
-                        alert(`Prova finalizada! Sua nota: ${notaFinal.toFixed(1)}`); app.navigate('provas');
+                        alert(`Nota: ${notaFinal.toFixed(1)}`); app.navigate('provas');
                     }
                 };
                 renderQuestao();
@@ -722,44 +769,19 @@
                 const alunosDaTurma = alunos.filter(a => alunosIds.includes(a.id));
                 const resultados = await this.getCollection('provas_resultados');
 
-                // Formato de Lista Detalhada para suportar Data Inicio/Fim
                 let dadosExcel = [];
-
                 alunosDaTurma.forEach(aluno => {
                     provas.forEach(prova => {
                         const res = resultados.find(r => r.provaId === prova.id && r.alunoId === aluno.id);
-                        
-                        let dataInicioFmt = '-';
-                        let dataFimFmt = '-';
-                        
-                        // Formatar datas se existirem
+                        let dataInicioFmt = '-'; let dataFimFmt = '-';
                         if(res) {
-                            if(res.dataInicio) {
-                                // Se for timestamp do firestore (convertido) ou Date puro
-                                const d = res.dataInicio.seconds ? new Date(res.dataInicio.seconds * 1000) : new Date(res.dataInicio);
-                                dataInicioFmt = d.toLocaleString();
-                            }
-                            if(res.dataFim) {
-                                const d = res.dataFim.seconds ? new Date(res.dataFim.seconds * 1000) : new Date(res.dataFim);
-                                dataFimFmt = d.toLocaleString();
-                            }
+                            if(res.dataInicio) { const d = res.dataInicio.seconds ? new Date(res.dataInicio.seconds * 1000) : new Date(res.dataInicio); dataInicioFmt = d.toLocaleString(); }
+                            if(res.dataFim) { const d = res.dataFim.seconds ? new Date(res.dataFim.seconds * 1000) : new Date(res.dataFim); dataFimFmt = d.toLocaleString(); }
                         }
-
-                        dadosExcel.push({
-                            "Aluno": aluno.nome,
-                            "Email": aluno.email,
-                            "Prova": prova.titulo,
-                            "Nota": res ? res.nota : 'Não realizada',
-                            "Data Início": dataInicioFmt,
-                            "Data Fim": dataFimFmt
-                        });
+                        dadosExcel.push({ "Aluno": aluno.nome, "Email": aluno.email, "Prova": prova.titulo, "Nota": res ? res.nota : 'Não realizada', "Data Início": dataInicioFmt, "Data Fim": dataFimFmt });
                     });
                 });
-
-                const ws = XLSX.utils.json_to_sheet(dadosExcel); 
-                const wb = XLSX.utils.book_new(); 
-                XLSX.utils.book_append_sheet(wb, ws, "Relatorio_Detalhado"); 
-                XLSX.writeFile(wb, `Diario_Turma_${turmaDoc.data().nome}.xlsx`);
+                const ws = XLSX.utils.json_to_sheet(dadosExcel); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Relatorio_Detalhado"); XLSX.writeFile(wb, `Diario_Turma_${turmaDoc.data().nome}.xlsx`);
             },
 
             // ==================== UTILS ====================
@@ -770,11 +792,11 @@
                 const modalId = 'm-' + Date.now();
                 const div = document.createElement('div'); div.id = modalId;
                 div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 fade-in';
-                div.innerHTML = `<div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"><div class="p-6 border-b flex justify-between items-center"><h3 class="font-bold text-lg">${title}</h3><button onclick="document.getElementById('${modalId}').remove()"><i class="fas fa-times"></i></button></div><div class="p-6">${content}</div><div class="p-6 border-t flex justify-end gap-3"><button onclick="document.getElementById('${modalId}').remove()" class="px-4 py-2 text-gray-600">Cancelar</button><button id="btn-c-${modalId}" class="px-4 py-2 bg-blue-700 text-white rounded-lg">Salvar</button></div></div>`;
+                div.innerHTML = `<div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border dark:border-slate-700"><div class="p-6 border-b dark:border-slate-700 flex justify-between items-center"><h3 class="font-bold text-lg dark:text-white">${title}</h3><button onclick="document.getElementById('${modalId}').remove()" class="text-gray-500 dark:text-gray-400"><i class="fas fa-times"></i></button></div><div class="p-6">${content}</div><div class="p-6 border-t dark:border-slate-700 flex justify-end gap-3"><button onclick="document.getElementById('${modalId}').remove()" class="px-4 py-2 text-gray-600 dark:text-gray-300">Cancelar</button><button id="btn-c-${modalId}" class="px-4 py-2 bg-blue-700 text-white rounded-lg">Salvar</button></div></div>`;
                 document.body.appendChild(div);
                 document.getElementById(`btn-c-${modalId}`).onclick = async () => { try { await onConfirm(); document.getElementById(modalId).remove(); this.showToast('Sucesso!'); } catch(e) { alert(e.message); } };
             },
-            showToast(m) { const t = document.getElementById('toast-container'); const e = document.createElement('div'); e.className = 'bg-gray-800 text-white px-6 py-3 rounded shadow-lg mb-2 fade-in'; e.innerText = m; t.appendChild(e); setTimeout(() => e.remove(), 3000); },
+            showToast(m) { const t = document.getElementById('toast-container'); const e = document.createElement('div'); e.className = 'bg-gray-800 dark:bg-slate-700 text-white px-6 py-3 rounded shadow-lg mb-2 fade-in'; e.innerText = m; t.appendChild(e); setTimeout(() => e.remove(), 3000); },
             capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
         };
 
