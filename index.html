@@ -278,7 +278,7 @@
                     </div>
                     <div class="mt-4 flex gap-2 justify-end">
                         <button onclick="app.exportarResultadosExcel('${turmaId}')" class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
-                            <i class="fas fa-file-excel mr-1"></i> Exportar
+                            <i class="fas fa-file-excel mr-1"></i> Exportar Diário
                         </button>
                     </div>
                 `;
@@ -561,6 +561,9 @@
             removerQuestao(index) { this.tempQuestoes.splice(index, 1); this.atualizarListaQuestoesUI(); },
 
             async iniciarProva(provaId) {
+                // Captura do inicio da prova para calculo no Excel depois
+                const dataInicioReal = new Date(); 
+                
                 const doc = await db.collection('provas').doc(provaId).get();
                 const prova = { id: doc.id, ...doc.data() };
                 let questaoAtualIdx = 0; let respostas = {}; let tempoRestante = 0; let timerInterval = null;
@@ -584,7 +587,14 @@
                     if (questaoAtualIdx < prova.questoes.length - 1) { questaoAtualIdx++; renderQuestao(); } else {
                         let acertos = 0; prova.questoes.forEach((q, i) => { if (respostas[i] === q.correta) acertos++; });
                         const notaFinal = (acertos / prova.questoes.length) * 100;
-                        await db.collection('provas_resultados').add({ provaId: prova.id, alunoId: this.currentUserData.id, respostas, nota: notaFinal.toFixed(1), dataFim: firebase.firestore.FieldValue.serverTimestamp() });
+                        await db.collection('provas_resultados').add({ 
+                            provaId: prova.id, 
+                            alunoId: this.currentUserData.id, 
+                            respostas, 
+                            nota: notaFinal.toFixed(1),
+                            dataInicio: dataInicioReal, // Salva o inicio capturado no começo da função
+                            dataFim: firebase.firestore.FieldValue.serverTimestamp() 
+                        });
                         alert(`Nota: ${notaFinal.toFixed(1)}`); app.navigate('provas');
                     }
                 };
@@ -605,12 +615,44 @@
                 const alunosDaTurma = alunos.filter(a => alunosIds.includes(a.id));
                 const resultados = await this.getCollection('provas_resultados');
 
-                const dadosExcel = alunosDaTurma.map(aluno => {
-                    const row = { Nome: aluno.nome, Email: aluno.email };
-                    provas.forEach(p => { const res = resultados.find(r => r.provaId === p.id && r.alunoId === aluno.id); row[p.titulo] = res ? res.nota : '-'; });
-                    return row;
+                // Formato de Lista Detalhada para suportar Data Inicio/Fim
+                let dadosExcel = [];
+
+                alunosDaTurma.forEach(aluno => {
+                    provas.forEach(prova => {
+                        const res = resultados.find(r => r.provaId === prova.id && r.alunoId === aluno.id);
+                        
+                        let dataInicioFmt = '-';
+                        let dataFimFmt = '-';
+                        
+                        // Formatar datas se existirem
+                        if(res) {
+                            if(res.dataInicio) {
+                                // Se for timestamp do firestore (convertido) ou Date puro
+                                const d = res.dataInicio.seconds ? new Date(res.dataInicio.seconds * 1000) : new Date(res.dataInicio);
+                                dataInicioFmt = d.toLocaleString();
+                            }
+                            if(res.dataFim) {
+                                const d = res.dataFim.seconds ? new Date(res.dataFim.seconds * 1000) : new Date(res.dataFim);
+                                dataFimFmt = d.toLocaleString();
+                            }
+                        }
+
+                        dadosExcel.push({
+                            "Aluno": aluno.nome,
+                            "Email": aluno.email,
+                            "Prova": prova.titulo,
+                            "Nota": res ? res.nota : 'Não realizada',
+                            "Data Início": dataInicioFmt,
+                            "Data Fim": dataFimFmt
+                        });
+                    });
                 });
-                const ws = XLSX.utils.json_to_sheet(dadosExcel); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Resultados"); XLSX.writeFile(wb, `Resultados.xlsx`);
+
+                const ws = XLSX.utils.json_to_sheet(dadosExcel); 
+                const wb = XLSX.utils.book_new(); 
+                XLSX.utils.book_append_sheet(wb, ws, "Relatorio_Detalhado"); 
+                XLSX.writeFile(wb, `Diario_Turma_${turmaDoc.data().nome}.xlsx`);
             },
 
             // ==================== UTILS ====================
