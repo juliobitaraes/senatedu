@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
@@ -26,6 +25,11 @@
         .upload-area:hover { border-color: #3b82f6; background-color: #eff6ff; }
         .progress-bar { height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #1e40af); transition: width 0.3s; }
+        /* Badge Styles */
+        .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-green { background-color: #dcfce7; color: #166534; }
+        .badge-blue { background-color: #dbeafe; color: #1e40af; }
+        .badge-yellow { background-color: #fef9c3; color: #854d0e; }
     </style>
 </head>
 <body class="text-gray-800 antialiased">
@@ -44,7 +48,9 @@
             appId: "1:279645366191:web:df16df577ccc959a4f315a"
         };
 
-        firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const auth = firebase.auth();
         const db = firebase.firestore();
         const storage = firebase.storage();
@@ -58,20 +64,24 @@
             uploadTask: null,
 
             init() {
-                this.renderLogin();
                 this.monitorAuth();
             },
 
             monitorAuth() {
                 auth.onAuthStateChanged(async (user) => {
                     if (user) {
-                        const doc = await db.collection('users').doc(user.uid).get();
-                        if (doc.exists) {
-                            this.currentUser = user;
-                            this.currentUserData = { id: user.uid, ...doc.data() };
-                            this.renderMainLayout();
-                        } else {
-                            auth.signOut();
+                        try {
+                            const doc = await db.collection('users').doc(user.uid).get();
+                            if (doc.exists) {
+                                this.currentUser = user;
+                                this.currentUserData = { id: user.uid, ...doc.data() };
+                                this.renderMainLayout();
+                            } else {
+                                auth.signOut();
+                            }
+                        } catch (e) {
+                            console.error("Erro auth", e);
+                            this.renderLogin();
                         }
                     } else {
                         this.currentUser = null;
@@ -80,6 +90,8 @@
                     }
                 });
             },
+
+            // ==================== LOGIN & LAYOUT ====================
 
             renderLogin() {
                 document.getElementById('app').innerHTML = `
@@ -108,11 +120,8 @@
                                     <span id="btn-text">Entrar</span>
                                 </button>
                             </form>
-
                             <div class="text-center text-sm">
-                                <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">
-                                    Criar conta de Administrador
-                                </button>
+                                <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">Criar conta de Administrador</button>
                             </div>
                         </div>
                     </div>
@@ -142,10 +151,7 @@
                 const senha = prompt('Crie uma senha (mínimo 6 caracteres):');
                 
                 if (!nome || !email || !senha) return;
-                if (senha.length < 6) {
-                    alert('A senha deve ter pelo menos 6 caracteres');
-                    return;
-                }
+                if (senha.length < 6) { alert('A senha deve ter pelo menos 6 caracteres'); return; }
                 
                 try {
                     const userCred = await auth.createUserWithEmailAndPassword(email, senha);
@@ -156,14 +162,10 @@
                         criado: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     alert('Administrador criado com sucesso!');
-                } catch (err) {
-                    alert('Erro: ' + err.message);
-                }
+                } catch (err) { alert('Erro: ' + err.message); }
             },
 
-            logout() {
-                auth.signOut();
-            },
+            logout() { auth.signOut(); },
 
             renderMainLayout() {
                 const appDiv = document.getElementById('app');
@@ -177,7 +179,7 @@
                                     </div>
                                     <div>
                                         <h1 class="text-xl font-bold">SENATEDU</h1>
-                                        <p class="text-xs text-slate-400">${this.currentUserData.tipo === 'admin' ? 'Administrador' : this.currentUserData.tipo === 'professor' ? 'Professor' : 'Aluno'}</p>
+                                        <p class="text-xs text-slate-400">${this.capitalize(this.currentUserData.tipo)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -222,19 +224,20 @@
                 const menus = {
                     admin: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
-                        { id: 'professores', icon: 'fa-chalkboard-teacher', label: 'Professores' },
-                        { id: 'turmas', icon: 'fa-users', label: 'Turmas' },
-                        { id: 'alunos', icon: 'fa-user-graduate', label: 'Alunos' }
+                        { id: 'turmas', icon: 'fa-chalkboard', label: 'Turmas' },
+                        { id: 'professores', icon: 'fa-chalkboard-teacher', label: 'Professores' }, // Poderia ser 'usuarios' filtrado
+                        { id: 'alunos', icon: 'fa-user-graduate', label: 'Alunos' },
+                        { id: 'materiais', icon: 'fa-book', label: 'Materiais' }
                     ],
                     professor: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
-                        { id: 'turmas', icon: 'fa-users', label: 'Minhas Turmas' },
                         { id: 'alunos', icon: 'fa-user-graduate', label: 'Meus Alunos' },
                         { id: 'materiais', icon: 'fa-book', label: 'Materiais' }
                     ],
                     aluno: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
-                        { id: 'materiais', icon: 'fa-book', label: 'Materiais' }
+                        { id: 'materiais', icon: 'fa-book', label: 'Materiais' },
+                        { id: 'provas', icon: 'fa-file-signature', label: 'Provas' }
                     ]
                 };
 
@@ -252,99 +255,408 @@
                 this.currentView = view;
                 this.renderSidebar();
                 this.renderContent();
-                if (window.innerWidth < 768) {
-                    document.getElementById('sidebar').classList.add('hidden');
-                }
+                if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('hidden');
             },
+
+            // ==================== RENDERIZADORES DE CONTEÚDO ====================
 
             async renderContent() {
                 const content = document.getElementById('content-area');
-                
+                content.innerHTML = '<div class="flex justify-center mt-10"><div class="loading border-blue-600 border-t-transparent w-10 h-10 border-4"></div></div>';
+
                 if (this.currentView === 'dashboard') {
-                    const totalProf = (await db.collection('users').where('tipo', '==', 'professor').get()).size;
-                    const totalAlunos = (await db.collection('users').where('tipo', '==', 'aluno').get()).size;
+                    await this.renderDashboard(content);
+                } else if (this.currentView === 'materiais') {
+                    await this.renderMateriais(content);
+                } else if (this.currentView === 'turmas' && this.currentUserData.tipo === 'admin') {
+                    await this.renderTurmas(content);
+                } else if (this.currentView === 'alunos') {
+                    await this.renderAlunos(content);
+                } else if (this.currentView === 'provas' && this.currentUserData.tipo === 'aluno') {
+                    await this.renderProvas(content);
+                } else {
+                    content.innerHTML = '<div class="text-center text-gray-500">Módulo em desenvolvimento ou acesso restrito.</div>';
+                }
+            },
+
+            async renderDashboard(container) {
+                if (this.currentUserData.tipo === 'aluno') {
+                    // Dashboard Aluno
+                    const turmas = await this.getCollection('turmas');
+                    const minhasTurmas = turmas.filter(t => t.alunos && t.alunos.includes(this.currentUserData.id));
                     
-                    content.innerHTML = `
+                    // Simular busca de provas realizadas
+                    const provas = await this.getCollection('provas_resultados'); // hipotetico
+                    const minhasProvas = provas.filter(p => p.alunoId === this.currentUserData.id);
+
+                    container.innerHTML = `
                         <div class="mb-6">
-                            <h2 class="text-2xl font-bold text-gray-800">Dashboard SENATEDU</h2>
-                            <p class="text-gray-600">Resumo do sistema</p>
+                            <h2 class="text-2xl font-bold text-gray-800">Olá, ${this.currentUserData.nome} 👋</h2>
+                            <p class="text-gray-600">Bem-vindo ao seu ambiente de estudos.</p>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                                <h3 class="text-gray-500 text-sm font-medium">Professores</h3>
-                                <p class="text-3xl font-bold text-blue-600 mt-2">${totalProf}</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                            <div class="bg-blue-600 text-white rounded-xl shadow-lg p-6">
+                                <h3 class="text-blue-100 text-sm font-medium">Turmas Matriculadas</h3>
+                                <p class="text-3xl font-bold mt-2">${minhasTurmas.length}</p>
                             </div>
                             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                                <h3 class="text-gray-500 text-sm font-medium">Alunos</h3>
+                                <h3 class="text-gray-500 text-sm font-medium">Provas Realizadas</h3>
+                                <p class="text-3xl font-bold text-blue-600 mt-2">${minhasProvas.length}</p>
+                            </div>
+                        </div>
+
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Minhas Turmas</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${minhasTurmas.map(t => `
+                                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-bold text-lg">${t.nome}</h4>
+                                        <p class="text-sm text-gray-500">Professores vinculados: ${t.professores?.length || 0}</p>
+                                    </div>
+                                    <div class="bg-blue-50 text-blue-600 p-2 rounded-lg">
+                                        <i class="fas fa-chalkboard"></i>
+                                    </div>
+                                </div>
+                            `).join('')}
+                            ${minhasTurmas.length === 0 ? '<p class="text-gray-500">Você não está vinculado a nenhuma turma.</p>' : ''}
+                        </div>
+                    `;
+                } else {
+                    // Dashboard Admin/Prof
+                    const turmas = await this.getCollection('turmas');
+                    const alunos = await this.getCollection('users');
+                    const totalAlunos = alunos.filter(u => u.tipo === 'aluno').length;
+                    
+                    let turmasExibir = turmas;
+                    if (this.currentUserData.tipo === 'professor') {
+                        turmasExibir = turmas.filter(t => t.professores && t.professores.includes(this.currentUserData.id));
+                    }
+
+                    container.innerHTML = `
+                         <div class="mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">Painel de Controle</h2>
+                            <p class="text-gray-600">Visão geral das turmas e alunos.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                                <h3 class="text-gray-500 text-sm font-medium">Total de Turmas ${this.currentUserData.tipo === 'professor' ? '(Suas)' : ''}</h3>
+                                <p class="text-3xl font-bold text-blue-600 mt-2">${turmasExibir.length}</p>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                                <h3 class="text-gray-500 text-sm font-medium">Total de Alunos (Sistema)</h3>
                                 <p class="text-3xl font-bold text-blue-600 mt-2">${totalAlunos}</p>
                             </div>
                         </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                                <h3 class="font-bold text-gray-700">Lista de Turmas Ativas</h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm text-gray-600">
+                                    <thead class="bg-gray-50 text-gray-800 border-b">
+                                        <tr>
+                                            <th class="p-4">Nome da Turma</th>
+                                            <th class="p-4">Qtd Alunos</th>
+                                            <th class="p-4">Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        ${turmasExibir.map(t => `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="p-4 font-medium">${t.nome}</td>
+                                                <td class="p-4">${t.alunos ? t.alunos.length : 0}</td>
+                                                <td class="p-4">
+                                                    <button onclick="app.navigate('alunos')" class="text-blue-600 hover:underline">Ver Alunos</button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     `;
-                } else if (this.currentView === 'materiais') {
-                    await this.renderMateriais(content);
-                } else {
-                    content.innerHTML = '<div class="text-center text-gray-500">Funcionalidade em desenvolvimento</div>';
                 }
             },
+
+            // ==================== GESTÃO DE TURMAS (ADMIN) ====================
+
+            async renderTurmas(container) {
+                const turmas = await this.getCollection('turmas');
+                const professores = (await this.getCollection('users')).filter(u => u.tipo === 'professor');
+
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Gerenciar Turmas</h2>
+                        <button onclick="app.modalTurma()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
+                            <i class="fas fa-plus mr-2"></i>Nova Turma
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${turmas.map(t => {
+                            const profsNomes = professores
+                                .filter(p => t.professores && t.professores.includes(p.id))
+                                .map(p => p.nome).join(', ') || 'Sem professor';
+
+                            return `
+                                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 relative group">
+                                    <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
+                                        <button onclick="app.modalTurma('${t.id}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i></button>
+                                        <button onclick="app.deleteItem('turmas', '${t.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                    <h3 class="font-bold text-lg text-gray-900">${t.nome}</h3>
+                                    <p class="text-sm text-gray-500 mt-1"><i class="fas fa-chalkboard-teacher mr-1"></i> ${profsNomes}</p>
+                                    <p class="text-sm text-gray-500 mt-1"><i class="fas fa-users mr-1"></i> ${t.alunos?.length || 0} alunos</p>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            },
+
+            async modalTurma(id = null) {
+                const professores = (await this.getCollection('users')).filter(u => u.tipo === 'professor');
+                let turma = null;
+                if (id) {
+                    const doc = await db.collection('turmas').doc(id).get();
+                    turma = { id: doc.id, ...doc.data() };
+                }
+
+                const content = `
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome da Turma</label>
+                        <input type="text" id="turma-nome" value="${turma ? turma.nome : ''}" class="w-full px-4 py-2 border rounded-lg mb-4">
+                        
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Professores Vinculados</label>
+                        <div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50">
+                            ${professores.map(p => `
+                                <label class="flex items-center space-x-2 p-1 hover:bg-gray-200 rounded cursor-pointer">
+                                    <input type="checkbox" class="prof-check" value="${p.id}" ${turma && turma.professores && turma.professores.includes(p.id) ? 'checked' : ''}>
+                                    <span>${p.nome}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                this.showModal(id ? 'Editar Turma' : 'Nova Turma', content, async () => {
+                    const nome = document.getElementById('turma-nome').value;
+                    const profChecks = document.querySelectorAll('.prof-check:checked');
+                    const professoresIds = Array.from(profChecks).map(c => c.value);
+
+                    if (!nome) return alert('Nome obrigatório');
+
+                    const data = { nome, professores: professoresIds };
+                    
+                    if (id) await db.collection('turmas').doc(id).update(data);
+                    else await db.collection('turmas').add({ ...data, alunos: [], criado: firebase.firestore.FieldValue.serverTimestamp() });
+                    
+                    this.renderContent();
+                });
+            },
+
+            // ==================== GESTÃO DE ALUNOS ====================
+
+            async renderAlunos(container) {
+                const turmas = await this.getCollection('turmas');
+                let alunos = (await this.getCollection('users')).filter(u => u.tipo === 'aluno');
+                
+                // Se for professor, ver apenas alunos das suas turmas
+                if (this.currentUserData.tipo === 'professor') {
+                    const minhasTurmasIds = turmas.filter(t => t.professores?.includes(this.currentUserData.id)).map(t => t.id);
+                    // Filtra turmas que o prof dá aula, e pega alunos vinculados a elas
+                    alunos = alunos.filter(a => {
+                        // Verifica se o aluno está em alguma turma do professor
+                        // Como os alunos estão salvos na collection de Turmas no array 'alunos', precisamos de logica reversa ou salvar turmas no aluno.
+                        // O sistema atual salva 'alunos' (array de ids) dentro do doc da Turma.
+                        return turmas.some(t => minhasTurmasIds.includes(t.id) && t.alunos && t.alunos.includes(a.id));
+                    });
+                }
+
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Gerenciar Alunos</h2>
+                        <button onclick="app.modalAluno()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
+                            <i class="fas fa-plus mr-2"></i>Novo Aluno
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <table class="w-full text-left text-sm text-gray-600">
+                            <thead class="bg-gray-50 text-gray-800 border-b">
+                                <tr>
+                                    <th class="p-4">Nome</th>
+                                    <th class="p-4">Email</th>
+                                    <th class="p-4">Turmas</th>
+                                    <th class="p-4 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                ${alunos.map(a => {
+                                    // Descobrir turmas do aluno
+                                    const turmasAluno = turmas.filter(t => t.alunos && t.alunos.includes(a.id)).map(t => t.nome).join(', ');
+                                    return `
+                                    <tr class="hover:bg-gray-50 group">
+                                        <td class="p-4 font-medium text-gray-900">${a.nome}</td>
+                                        <td class="p-4">${a.email}</td>
+                                        <td class="p-4"><span class="badge badge-blue">${turmasAluno || 'Nenhuma'}</span></td>
+                                        <td class="p-4 text-right">
+                                            <button onclick="app.modalAluno('${a.id}')" class="text-blue-600 hover:text-blue-800 mr-3"><i class="fas fa-edit"></i></button>
+                                            ${this.currentUserData.tipo === 'admin' ? `<button onclick="app.deleteUsuario('${a.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>` : ''}
+                                        </td>
+                                    </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            },
+
+            async modalAluno(id = null) {
+                const turmas = await this.getCollection('turmas');
+                let aluno = null;
+                let turmasDoAluno = [];
+
+                if (id) {
+                    const doc = await db.collection('users').doc(id).get();
+                    aluno = { id: doc.id, ...doc.data() };
+                    turmasDoAluno = turmas.filter(t => t.alunos && t.alunos.includes(id)).map(t => t.id);
+                }
+
+                const content = `
+                    <div class="space-y-3">
+                        ${!id ? `
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email (Login)</label>
+                            <input type="email" id="alu-email" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Senha Provisória</label>
+                            <input type="password" id="alu-pass" class="w-full px-4 py-2 border rounded-lg">
+                        </div>` : ''}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                            <input type="text" id="alu-nome" value="${aluno ? aluno.nome : ''}" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Vincular às Turmas</label>
+                            <div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50">
+                                ${turmas.map(t => `
+                                    <label class="flex items-center space-x-2 p-1 hover:bg-gray-200 rounded cursor-pointer">
+                                        <input type="checkbox" class="turma-check" value="${t.id}" ${turmasDoAluno.includes(t.id) ? 'checked' : ''}>
+                                        <span>${t.nome}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                this.showModal(id ? 'Editar Aluno' : 'Novo Aluno', content, async () => {
+                    const nome = document.getElementById('alu-nome').value;
+                    const turmasChecks = document.querySelectorAll('.turma-check:checked');
+                    const novasTurmasIds = Array.from(turmasChecks).map(c => c.value);
+
+                    let uid = id;
+
+                    // Criar usuário no Auth se for novo
+                    if (!id) {
+                        const email = document.getElementById('alu-email').value;
+                        const pass = document.getElementById('alu-pass').value;
+                        if (!email || !pass || !nome) return alert('Preencha todos os campos');
+                        
+                        // Nota: Criar usuário secundário estando logado derruba a sessão atual no SDK client-side.
+                        // O ideal seria usar Cloud Functions. Aqui faremos um "workaround" simples: criar apenas o registro no banco
+                        // e instruir que o Admin crie via console ou use outra sessão, OU (melhor para demo) criar e re-logar.
+                        // Para simplificar este código frontend-only: Vamos apenas criar o documento no Firestore para "vincular".
+                        // O auth real teria que ser feito em outra aba ou via Admin SDK.
+                        // *Solução para demo*: Avisar que a criação de Auth requer painel admin real. 
+                        // Vamos apenas simular a criação do doc 'users' para que apareça na lista e vinculo.
+                        
+                        // Criação REAL (Auth) não é possível aqui sem deslogar o admin. 
+                        // Vamos apenas editar o doc user se existir ID, ou alertar limitação.
+                        alert('Em um sistema client-side puro, criar contas para terceiros requer Cloud Functions. \n\nPara esta demonstração, vou criar apenas o registro no banco de dados para permitir o vínculo de turmas.');
+                        
+                        // Gerar ID aleatorio
+                        uid = db.collection('users').doc().id;
+                        await db.collection('users').doc(uid).set({
+                            nome, email, tipo: 'aluno', criado: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        await db.collection('users').doc(uid).update({ nome });
+                    }
+
+                    // Atualizar vinculos nas Turmas
+                    // 1. Remover aluno de todas as turmas (reset)
+                    const todasTurmas = await this.getCollection('turmas');
+                    for (const t of todasTurmas) {
+                        if (t.alunos && t.alunos.includes(uid)) {
+                            await db.collection('turmas').doc(t.id).update({
+                                alunos: firebase.firestore.FieldValue.arrayRemove(uid)
+                            });
+                        }
+                    }
+
+                    // 2. Adicionar nas selecionadas
+                    for (const tid of novasTurmasIds) {
+                        await db.collection('turmas').doc(tid).update({
+                            alunos: firebase.firestore.FieldValue.arrayUnion(uid)
+                        });
+                    }
+
+                    this.renderContent();
+                });
+            },
+
+            // ==================== MATERIAIS (CRUD) ====================
 
             async renderMateriais(container) {
                 const turmas = await this.getCollection('turmas');
                 let materiais = await this.getCollection('materiais');
                 
-                // Se for aluno, filtra só os da turma dele
+                // Filtros de visualização
                 if (this.currentUserData.tipo === 'aluno') {
-                    const turmaAluno = turmas.find(t => t.alunos?.includes(this.currentUserData.id));
-                    if (turmaAluno) {
-                        materiais = materiais.filter(m => m.turmaId === turmaAluno.id);
-                    }
+                    const minhasTurmas = turmas.filter(t => t.alunos?.includes(this.currentUserData.id)).map(t => t.id);
+                    materiais = materiais.filter(m => minhasTurmas.includes(m.turmaId));
+                } else if (this.currentUserData.tipo === 'professor') {
+                     // Professor vê materiais das suas turmas OU materiais que ele mesmo criou
+                     const minhasTurmas = turmas.filter(t => t.professores?.includes(this.currentUserData.id)).map(t => t.id);
+                     materiais = materiais.filter(m => minhasTurmas.includes(m.turmaId) || m.professorId === this.currentUserData.id);
                 }
 
                 container.innerHTML = `
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Materiais Didáticos</h2>
-                        ${this.currentUserData.tipo === 'professor' ? `
                         <button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
                             <i class="fas fa-plus mr-2"></i>Adicionar Material
                         </button>
-                        ` : ''}
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         ${materiais.map(m => {
                             let icon, color, btnText;
                             
-                            if (m.tipo === 'youtube') {
-                                icon = 'fa-youtube';
-                                color = 'text-red-600';
-                                btnText = 'Assistir';
-                            } else if (m.tipo === 'link') {
-                                icon = 'fa-link';
-                                color = 'text-green-600';
-                                btnText = 'Acessar Link';
-                            } else if (m.tipo === 'pdf') {
-                                icon = 'fa-file-pdf';
-                                color = 'text-red-500';
-                                btnText = 'Baixar PDF';
-                            } else if (['doc', 'docx'].includes(m.tipo)) {
-                                icon = 'fa-file-word';
-                                color = 'text-blue-600';
-                                btnText = 'Baixar Documento';
-                            } else if (['xls', 'xlsx'].includes(m.tipo)) {
-                                icon = 'fa-file-excel';
-                                color = 'text-green-600';
-                                btnText = 'Baixar Planilha';
-                            } else if (['ppt', 'pptx'].includes(m.tipo)) {
-                                icon = 'fa-file-powerpoint';
-                                color = 'text-orange-500';
-                                btnText = 'Baixar Apresentação';
-                            } else {
-                                icon = 'fa-file';
-                                color = 'text-gray-600';
-                                btnText = 'Baixar Arquivo';
-                            }
+                            if (m.tipo === 'youtube') { icon = 'fa-youtube'; color = 'text-red-600'; btnText = 'Assistir'; }
+                            else if (m.tipo === 'link') { icon = 'fa-link'; color = 'text-green-600'; btnText = 'Acessar'; }
+                            else { icon = 'fa-file-alt'; color = 'text-blue-600'; btnText = 'Baixar'; }
                             
+                            // Permissão de edição: Admin, Professor, ou Aluno (se for dono do material)
+                            const canEdit = this.currentUserData.tipo === 'admin' || 
+                                          this.currentUserData.tipo === 'professor' || 
+                                          (this.currentUserData.tipo === 'aluno' && m.professorId === this.currentUserData.id);
+
                             return `
-                                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
+                                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover relative group">
+                                    ${canEdit ? `
+                                    <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition bg-white rounded-lg shadow-sm p-1">
+                                        <button onclick="app.showAddMaterialModal('${m.id}')" class="text-blue-600 hover:text-blue-800 mx-1"><i class="fas fa-edit"></i></button>
+                                        <button onclick="app.deleteItem('materiais', '${m.id}')" class="text-red-500 hover:text-red-700 mx-1"><i class="fas fa-trash"></i></button>
+                                    </div>` : ''}
+                                    
                                     <div class="flex items-start gap-4 mb-4">
                                         <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                                             <i class="fas ${icon} ${color} text-xl"></i>
@@ -352,335 +664,255 @@
                                         <div class="flex-1 min-w-0">
                                             <h3 class="font-bold text-gray-900 truncate" title="${m.titulo}">${m.titulo}</h3>
                                             <p class="text-xs text-gray-500 mt-1">${m.turmaNome || 'Geral'}</p>
-                                            <p class="text-xs text-gray-400">${m.tipo.toUpperCase()}</p>
+                                            <p class="text-xs text-gray-400">Por: ${m.professorNome}</p>
                                         </div>
                                     </div>
                                     <a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 text-blue-700 text-center rounded-lg hover:bg-blue-100 text-sm font-medium">
-                                        <i class="fas fa-download mr-2"></i>${btnText}
+                                        ${btnText}
                                     </a>
                                 </div>
                             `;
                         }).join('')}
                     </div>
-                    
-                    ${materiais.length === 0 ? '<p class="text-center text-gray-500 mt-8">Nenhum material cadastrado</p>' : ''}
                 `;
             },
 
-            showAddMaterialModal() {
+            // ==================== PROVAS (ALUNO) ====================
+
+            async renderProvas(container) {
+                // Simulação de dados de prova (Mock), pois não temos a collection completa
+                const provasMock = [
+                    { id: '1', titulo: 'Matemática - Álgebra', data: '2025-02-10', status: 'agendada', nota: null },
+                    { id: '2', titulo: 'História - Revolução Industrial', data: '2025-01-20', status: 'realizada', nota: 8.5 },
+                    { id: '3', titulo: 'Física - Cinemática', data: '2025-02-02', status: 'disponivel', nota: null }
+                ];
+
+                container.innerHTML = `
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Minhas Provas</h2>
+                        <div class="flex space-x-2 mt-4 border-b">
+                            <button class="px-4 py-2 text-blue-600 border-b-2 border-blue-600 font-medium">Todas</button>
+                            <button class="px-4 py-2 text-gray-500 hover:text-gray-700">Agendadas</button>
+                            <button class="px-4 py-2 text-gray-500 hover:text-gray-700">Realizadas</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        ${provasMock.map(p => {
+                            let badgeClass = '';
+                            let label = '';
+                            
+                            if (p.status === 'realizada') { badgeClass = 'badge-green'; label = 'Realizada'; }
+                            else if (p.status === 'agendada') { badgeClass = 'badge-yellow'; label = 'Agendada'; }
+                            else { badgeClass = 'badge-blue'; label = 'Disponível'; }
+
+                            return `
+                                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                                    <div>
+                                        <div class="flex items-center space-x-3 mb-1">
+                                            <span class="badge ${badgeClass}">${label}</span>
+                                            <span class="text-sm text-gray-500"><i class="far fa-calendar-alt mr-1"></i> ${p.data}</span>
+                                        </div>
+                                        <h3 class="font-bold text-lg">${p.titulo}</h3>
+                                    </div>
+                                    <div class="text-right">
+                                        ${p.status === 'realizada' 
+                                            ? `<div class="text-2xl font-bold ${p.nota >= 6 ? 'text-green-600' : 'text-red-600'}">${p.nota}</div><div class="text-xs text-gray-400">Nota</div>` 
+                                            : `<button class="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">Ver Detalhes</button>`}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            },
+
+            // ==================== UTILITÁRIOS E MODAIS GERAIS ====================
+
+            showModal(title, contentHtml, onConfirm) {
+                const modalId = 'dynamic-modal';
+                const existing = document.getElementById(modalId);
+                if (existing) existing.remove();
+
                 const div = document.createElement('div');
-                div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
-                div.id = 'modal-materiais';
+                div.id = modalId;
+                div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 fade-in';
                 div.innerHTML = `
-                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                         <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                            <h3 class="text-xl font-bold text-gray-800">Adicionar Material</h3>
-                            <button onclick="document.getElementById('modal-materiais').remove()" class="text-gray-400 hover:text-gray-600">
-                                <i class="fas fa-times"></i>
-                            </button>
+                            <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+                            <button onclick="document.getElementById('${modalId}').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
                         </div>
-                        
-                        <div class="p-6 space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Título *</label>
-                                <input type="text" id="mat-titulo" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: Aula de Matemática - Semana 1">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Turma *</label>
-                                <select id="mat-turma" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                    <option value="">Selecione a turma</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Material</label>
-                                <div class="flex gap-2">
-                                    <button type="button" onclick="app.selectMaterialType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
-                                        <i class="fas fa-file-upload mr-1"></i>Arquivo
-                                    </button>
-                                    <button type="button" onclick="app.selectMaterialType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm">
-                                        <i class="fas fa-link mr-1"></i>Link
-                                    </button>
-                                    <button type="button" onclick="app.selectMaterialType('youtube')" id="btn-youtube" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm">
-                                        <i class="fab fa-youtube mr-1"></i>YouTube
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Área de Upload de Arquivo -->
-                            <div id="upload-area">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Arquivo (Máx 30MB)</label>
-                                <div class="upload-area border-2 border-dashed rounded-lg p-6 text-center" onclick="document.getElementById('mat-file').click()">
-                                    <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
-                                    <p class="text-sm text-gray-600">Clique para selecionar ou arraste aqui</p>
-                                    <p class="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG</p>
-                                    <input type="file" id="mat-file" class="hidden" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg" onchange="app.handleFile(this)">
-                                </div>
-                                <div id="file-info" class="hidden mt-2 p-3 bg-blue-50 rounded-lg">
-                                    <p class="text-sm font-medium text-blue-800" id="file-name"></p>
-                                    <p class="text-xs text-blue-600" id="file-size"></p>
-                                </div>
-                                <div id="upload-progress" class="hidden mt-3">
-                                    <div class="flex justify-between text-xs text-gray-600 mb-1">
-                                        <span>Enviando...</span>
-                                        <span id="progress-text">0%</span>
-                                    </div>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" id="progress-bar" style="width: 0%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Área de Link -->
-                            <div id="link-area" class="hidden">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">URL *</label>
-                                <input type="url" id="mat-url" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://...">
-                                <p class="text-xs text-gray-500 mt-1">Cole o link do Google Drive, YouTube ou outro site</p>
-                            </div>
-                        </div>
-                        
+                        <div class="p-6">${contentHtml}</div>
                         <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
-                            <button onclick="document.getElementById('modal-materiais').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
-                            <button onclick="app.saveMaterial()" id="btn-save" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">Salvar Material</button>
+                            <button onclick="document.getElementById('${modalId}').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+                            <button id="modal-confirm-btn" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">Salvar</button>
                         </div>
                     </div>
                 `;
-                
                 document.body.appendChild(div);
-                this.loadTurmasSelect();
+                document.getElementById('modal-confirm-btn').onclick = async () => {
+                    const btn = document.getElementById('modal-confirm-btn');
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    try {
+                        await onConfirm();
+                        document.getElementById(modalId).remove();
+                        this.showToast('Operação realizada com sucesso!');
+                    } catch (e) {
+                        console.error(e);
+                        alert('Erro: ' + e.message);
+                        btn.disabled = false;
+                        btn.textContent = 'Salvar';
+                    }
+                };
             },
 
-            async loadTurmasSelect() {
+            async showAddMaterialModal(editId = null) {
+                let material = null;
+                if (editId) {
+                    const doc = await db.collection('materiais').doc(editId).get();
+                    material = { id: doc.id, ...doc.data() };
+                }
+
+                // Carrega turmas permitidas para o select
                 const turmas = await this.getCollection('turmas');
-                const select = document.getElementById('mat-turma');
+                let options = '';
                 
-                // Se for professor, filtra só as turmas dele
+                // Filtro de Turmas no Select
+                let turmasPermitidas = turmas;
                 if (this.currentUserData.tipo === 'professor') {
-                    const minhasTurmas = turmas.filter(t => t.professorId === this.currentUserData.id);
-                    minhasTurmas.forEach(t => {
-                        const option = document.createElement('option');
-                        option.value = t.id;
-                        option.textContent = t.nome;
-                        option.dataset.nome = t.nome;
-                        select.appendChild(option);
-                    });
-                } else {
-                    turmas.forEach(t => {
-                        const option = document.createElement('option');
-                        option.value = t.id;
-                        option.textContent = t.nome;
-                        option.dataset.nome = t.nome;
-                        select.appendChild(option);
-                    });
+                    turmasPermitidas = turmas.filter(t => t.professores?.includes(this.currentUserData.id));
+                } else if (this.currentUserData.tipo === 'aluno') {
+                    turmasPermitidas = turmas.filter(t => t.alunos?.includes(this.currentUserData.id));
                 }
-            },
 
-            selectMaterialType(type) {
-                this.currentMaterialType = type;
-                
-                // Atualiza botões visuais
-                const types = ['arquivo', 'link', 'youtube'];
-                types.forEach(t => {
-                    const btn = document.getElementById(`btn-${t}`);
-                    if (t === type) {
-                        btn.className = 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm';
-                    } else {
-                        btn.className = 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm';
-                    }
+                turmasPermitidas.forEach(t => {
+                    options += `<option value="${t.id}" data-nome="${t.nome}" ${material && material.turmaId === t.id ? 'selected' : ''}>${t.nome}</option>`;
                 });
-                
-                // Mostra/esconde áreas
-                if (type === 'arquivo') {
-                    document.getElementById('upload-area').classList.remove('hidden');
-                    document.getElementById('link-area').classList.add('hidden');
-                } else {
-                    document.getElementById('upload-area').classList.add('hidden');
-                    document.getElementById('link-area').classList.remove('hidden');
-                }
-                
-                // Limpa seleções anteriores
-                this.selectedFile = null;
-                if (document.getElementById('mat-file')) {
-                    document.getElementById('mat-file').value = '';
-                }
-                if (document.getElementById('file-info')) {
-                    document.getElementById('file-info').classList.add('hidden');
-                }
-            },
 
-            handleFile(input) {
-                const file = input.files[0];
-                if (!file) return;
-                
-                // Verifica tamanho (30MB)
-                if (file.size > 30 * 1024 * 1024) {
-                    alert('Arquivo muito grande! Limite máximo: 30MB\nSeu arquivo tem: ' + (file.size / 1024 / 1024).toFixed(2) + 'MB');
-                    input.value = '';
-                    return;
-                }
-                
-                // Verifica extensão
-                const allowedTypes = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
-                const ext = file.name.split('.').pop().toLowerCase();
-                
-                if (!allowedTypes.includes(ext)) {
-                    alert('Tipo de arquivo não permitido!\n\nPermitidos: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG, JPEG');
-                    input.value = '';
-                    return;
-                }
-                
-                this.selectedFile = file;
-                
-                // Mostra informações do arquivo
-                document.getElementById('file-name').textContent = file.name;
-                document.getElementById('file-size').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
-                document.getElementById('file-info').classList.remove('hidden');
-            },
+                const content = `
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                            <input type="text" id="mat-titulo" value="${material ? material.titulo : ''}" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+                            <select id="mat-turma" class="w-full px-4 py-2 border rounded-lg">
+                                <option value="">Selecione...</option>
+                                ${options}
+                            </select>
+                        </div>
+                        
+                        ${!editId ? `
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                            <div class="flex gap-2">
+                                <button type="button" onclick="app.toggleMatType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm">Arquivo</button>
+                                <button type="button" onclick="app.toggleMatType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm">Link</button>
+                            </div>
+                        </div>
+                        <div id="area-arquivo" class="mt-2">
+                            <input type="file" id="mat-file" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        </div>
+                        <div id="area-link" class="hidden mt-2">
+                            <input type="url" id="mat-url" placeholder="https://..." class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
 
-            async saveMaterial() {
-                const titulo = document.getElementById('mat-titulo').value.trim();
-                const turmaSelect = document.getElementById('mat-turma');
-                const turmaId = turmaSelect.value;
-                const turmaNome = turmaSelect.options[turmaSelect.selectedIndex]?.dataset.nome || 'Geral';
-                
-                if (!titulo || !turmaId) {
-                    alert('Preencha o título e selecione a turma!');
-                    return;
-                }
-                
-                const btnSave = document.getElementById('btn-save');
-                btnSave.disabled = true;
-                btnSave.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Salvando...';
-                
-                try {
-                    let url = '';
-                    let tipo = this.currentMaterialType;
-                    let fileName = '';
+                this.showModal(editId ? 'Editar Material' : 'Novo Material', content, async () => {
+                    const titulo = document.getElementById('mat-titulo').value;
+                    const select = document.getElementById('mat-turma');
+                    const turmaId = select.value;
+                    const turmaNome = select.options[select.selectedIndex]?.dataset.nome;
+
+                    if (!titulo || !turmaId) throw new Error('Preencha título e turma');
+
+                    const data = { titulo, turmaId, turmaNome };
                     
-                    if (tipo === 'arquivo') {
-                        if (!this.selectedFile) {
-                            alert('Selecione um arquivo!');
-                            btnSave.disabled = false;
-                            btnSave.textContent = 'Salvar Material';
-                            return;
-                        }
-                        
-                        // Prepara o upload
-                        const ext = this.selectedFile.name.split('.').pop().toLowerCase();
-                        const timestamp = Date.now();
-                        const fileNameStorage = `materiais/${turmaId}/${timestamp}_${this.selectedFile.name}`;
-                        
-                        const fileRef = storage.ref().child(fileNameStorage);
-                        const uploadTask = fileRef.put(this.selectedFile);
-                        
-                        // Mostra progresso
-                        document.getElementById('upload-progress').classList.remove('hidden');
-                        
-                        // Monitora progresso
-                        uploadTask.on('state_changed', 
-                            (snapshot) => {
-                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                                document.getElementById('progress-bar').style.width = progress + '%';
-                                document.getElementById('progress-text').textContent = Math.round(progress) + '%';
-                            },
-                            (error) => {
-                                console.error('Erro upload:', error);
-                                alert('Erro ao enviar arquivo: ' + error.message);
-                                btnSave.disabled = false;
-                                btnSave.textContent = 'Salvar Material';
-                                document.getElementById('upload-progress').classList.add('hidden');
-                            },
-                            async () => {
-                                // Upload completo
-                                url = await uploadTask.snapshot.ref.getDownloadURL();
-                                fileName = this.selectedFile.name;
-                                
-                                // Salva no Firestore
-                                await this.saveToFirestore({
-                                    titulo,
-                                    turmaId,
-                                    turmaNome,
-                                    tipo: ext,
-                                    url,
-                                    fileName,
-                                    professorId: this.currentUserData.id,
-                                    professorNome: this.currentUserData.nome,
-                                    tamanho: this.selectedFile.size,
-                                    criado: firebase.firestore.FieldValue.serverTimestamp()
-                                });
-                            }
-                        );
-                        return; // Sai da função pois o resto é feito no callback acima
-                        
+                    if (editId) {
+                        await db.collection('materiais').doc(editId).update(data);
                     } else {
-                        // Link ou YouTube
-                        url = document.getElementById('mat-url').value.trim();
+                        // Logica de upload (simplificada para manter no bloco)
+                        const tipo = this.currentMaterialType;
+                        let url = '';
                         
-                        if (!url) {
-                            alert('Informe a URL!');
-                            btnSave.disabled = false;
-                            btnSave.textContent = 'Salvar Material';
-                            return;
+                        if (tipo === 'link') {
+                            url = document.getElementById('mat-url').value;
+                            data.tipo = 'link';
+                            if(url.includes('youtu')) data.tipo = 'youtube';
+                        } else {
+                            const file = document.getElementById('mat-file').files[0];
+                            if (!file) throw new Error('Selecione um arquivo');
+                            const ref = storage.ref().child(`materiais/${Date.now()}_${file.name}`);
+                            await ref.put(file);
+                            url = await ref.getDownloadURL();
+                            data.tipo = file.name.split('.').pop();
                         }
                         
-                        // Valida URL YouTube
-                        if (tipo === 'youtube') {
-                            if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
-                                alert('URL do YouTube inválida!');
-                                btnSave.disabled = false;
-                                btnSave.textContent = 'Salvar Material';
-                                return;
-                            }
-                        }
+                        data.url = url;
+                        data.professorId = this.currentUserData.id;
+                        data.professorNome = this.currentUserData.nome;
+                        data.criado = firebase.firestore.FieldValue.serverTimestamp();
                         
-                        await this.saveToFirestore({
-                            titulo,
-                            turmaId,
-                            turmaNome,
-                            tipo,
-                            url,
-                            professorId: this.currentUserData.id,
-                            professorNome: this.currentUserData.nome,
-                            criado: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                        await db.collection('materiais').add(data);
                     }
-                    
-                } catch (err) {
-                    console.error(err);
-                    alert('Erro ao salvar: ' + err.message);
-                    btnSave.disabled = false;
-                    btnSave.textContent = 'Salvar Material';
-                }
-            },
-
-            async saveToFirestore(data) {
-                try {
-                    await db.collection('materiais').add(data);
-                    this.showToast('Material adicionado com sucesso!', 'success');
-                    document.getElementById('modal-materiais').remove();
                     this.renderContent();
-                } catch (err) {
-                    alert('Erro ao salvar no banco: ' + err.message);
-                    document.getElementById('btn-save').disabled = false;
-                    document.getElementById('btn-save').textContent = 'Salvar Material';
+                });
+            },
+
+            toggleMatType(type) {
+                this.currentMaterialType = type;
+                if(type === 'arquivo') {
+                    document.getElementById('area-arquivo').classList.remove('hidden');
+                    document.getElementById('area-link').classList.add('hidden');
+                    document.getElementById('btn-arquivo').classList.add('border-blue-500', 'bg-blue-50', 'text-blue-700');
+                    document.getElementById('btn-link').classList.remove('border-blue-500', 'bg-blue-50', 'text-blue-700');
+                } else {
+                    document.getElementById('area-arquivo').classList.add('hidden');
+                    document.getElementById('area-link').classList.remove('hidden');
+                    document.getElementById('btn-link').classList.add('border-blue-500', 'bg-blue-50', 'text-blue-700');
+                    document.getElementById('btn-arquivo').classList.remove('border-blue-500', 'bg-blue-50', 'text-blue-700');
                 }
             },
 
-            async getCollection(collection) {
-                const snapshot = await db.collection(collection).get();
-                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            async deleteItem(collection, id) {
+                if(confirm('Tem certeza que deseja excluir?')) {
+                    await db.collection(collection).doc(id).delete();
+                    this.showToast('Item excluído');
+                    this.renderContent();
+                }
+            },
+            
+            async deleteUsuario(id) {
+                // Apenas deleta do Firestore. Auth não deleta via Client SDK se não for o proprio usuario.
+                if(confirm('Remover usuário do sistema? (O acesso será revogado)')) {
+                    await db.collection('users').doc(id).delete();
+                    this.showToast('Usuário removido');
+                    this.renderContent();
+                }
             },
 
-            showToast(message, type = 'success') {
-                const container = document.getElementById('toast-container');
-                const toast = document.createElement('div');
-                const color = type === 'success' ? 'bg-blue-600' : 'bg-red-500';
-                toast.className = `${color} text-white px-6 py-3 rounded-lg shadow-lg mb-2 fade-in`;
-                toast.textContent = message;
-                container.appendChild(toast);
-                setTimeout(() => toast.remove(), 3000);
-            }
+            // ==================== HELPERS ====================
+            
+            async getCollection(name) {
+                const snap = await db.collection(name).get();
+                return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            },
+
+            showToast(msg) {
+                const t = document.getElementById('toast-container');
+                const el = document.createElement('div');
+                el.className = 'bg-gray-800 text-white px-6 py-3 rounded shadow-lg mb-2 fade-in';
+                el.innerText = msg;
+                t.appendChild(el);
+                setTimeout(() => el.remove(), 3000);
+            },
+            
+            capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
         };
 
         app.init();
