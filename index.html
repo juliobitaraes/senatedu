@@ -272,20 +272,110 @@
 
             // ==================== DASHBOARD ====================
             async renderDashboard(container) {
-                if (this.currentUserData.tipo === 'aluno') {
+                // DASHBOARD PROFESSOR
+                if (this.currentUserData.tipo === 'professor') {
+                    const turmas = (await this.getCollection('turmas')).filter(t => t.professores && t.professores.includes(this.currentUserData.id));
+                    const users = await this.getCollection('users');
+                    const provasData = await this.getProvasData(users); // Busca notas (ou mock)
+
+                    container.innerHTML = `
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">Diário de Classe</h2>
+                            <p class="text-gray-600">Gestão das suas turmas e desempenho dos alunos.</p>
+                        </div>
+                    `;
+
+                    if (turmas.length === 0) {
+                        container.innerHTML += `<div class="bg-yellow-50 p-4 rounded-lg text-yellow-700">Você ainda não está vinculado a nenhuma turma.</div>`;
+                        return;
+                    }
+
+                    const turmasHtml = turmas.map(t => {
+                        // Alunos desta turma
+                        const alunosDaTurma = users.filter(u => t.alunos && t.alunos.includes(u.id));
+                        
+                        return `
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+                            <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                                <div>
+                                    <h3 class="font-bold text-lg text-blue-900">${t.nome}</h3>
+                                    <p class="text-xs text-gray-500">${alunosDaTurma.length} Alunos matriculados</p>
+                                </div>
+                                <button onclick="app.navigate('materiais')" class="text-sm bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-50 text-gray-600">
+                                    <i class="fas fa-book mr-1"></i> Materiais
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm text-gray-600">
+                                    <thead class="bg-white border-b">
+                                        <tr>
+                                            <th class="p-4 w-1/3">Aluno</th>
+                                            <th class="p-4">Avaliações e Notas</th>
+                                            <th class="p-4 text-right">Situação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        ${alunosDaTurma.length > 0 ? alunosDaTurma.map(aluno => {
+                                            // Notas deste aluno
+                                            const notasAluno = provasData.filter(p => p.alunoId === aluno.id);
+                                            const media = notasAluno.length ? (notasAluno.reduce((acc, curr) => acc + parseFloat(curr.nota), 0) / notasAluno.length).toFixed(1) : '-';
+                                            
+                                            return `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="p-4 font-medium text-gray-900 flex items-center gap-3">
+                                                    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                                                        ${aluno.nome.charAt(0)}
+                                                    </div>
+                                                    ${aluno.nome}
+                                                </td>
+                                                <td class="p-4">
+                                                    <div class="flex flex-wrap gap-2">
+                                                        ${notasAluno.length > 0 ? notasAluno.map(n => `
+                                                            <div class="bg-gray-100 px-2 py-1 rounded text-xs border border-gray-200" title="${n.titulo}">
+                                                                <span class="text-gray-500 mr-1">P${n.id.slice(-1)}:</span>
+                                                                <span class="font-bold ${n.nota >= 6 ? 'text-green-600' : 'text-red-600'}">${n.nota}</span>
+                                                            </div>
+                                                        `).join('') : '<span class="text-gray-400 italic">Sem notas</span>'}
+                                                    </div>
+                                                </td>
+                                                <td class="p-4 text-right">
+                                                    ${media !== '-' ? `
+                                                        <span class="font-bold ${media >= 6 ? 'text-green-600' : 'text-red-600'}">${media}</span>
+                                                    ` : '-'}
+                                                </td>
+                                            </tr>
+                                            `;
+                                        }).join('') : `<tr><td colspan="3" class="p-6 text-center text-gray-400">Nenhum aluno nesta turma.</td></tr>`}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                    
+                    container.innerHTML += turmasHtml;
+                } 
+                // DASHBOARD ALUNO
+                else if (this.currentUserData.tipo === 'aluno') {
                     const turmas = await this.getCollection('turmas');
                     const minhasTurmas = turmas.filter(t => t.alunos && t.alunos.includes(this.currentUserData.id));
-                    const provas = await this.getCollection('provas_resultados'); // hipotetico
+                    const users = await this.getCollection('users'); // Necessário para simular notas consistentes
+                    const provasData = await this.getProvasData(users);
+                    const minhasProvas = provasData.filter(p => p.alunoId === this.currentUserData.id);
 
                     container.innerHTML = `
                         <div class="mb-6">
                             <h2 class="text-2xl font-bold text-gray-800">Olá, ${this.currentUserData.nome} 👋</h2>
-                            <p class="text-gray-600">Bem-vindo ao seu ambiente de estudos.</p>
+                            <p class="text-gray-600">Resumo do seu desempenho acadêmico.</p>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             <div class="bg-blue-600 text-white rounded-xl shadow-lg p-6">
                                 <h3 class="text-blue-100 text-sm font-medium">Turmas Matriculadas</h3>
                                 <p class="text-3xl font-bold mt-2">${minhasTurmas.length}</p>
+                            </div>
+                             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                                <h3 class="text-gray-500 text-sm font-medium">Provas Realizadas</h3>
+                                <p class="text-3xl font-bold text-green-600 mt-2">${minhasProvas.length}</p>
                             </div>
                         </div>
                         <h3 class="text-xl font-bold text-gray-800 mb-4">Minhas Turmas</h3>
@@ -296,44 +386,42 @@
                                     <div class="bg-blue-50 text-blue-600 p-2 rounded-lg"><i class="fas fa-chalkboard"></i></div>
                                 </div>
                             `).join('')}
+                            ${minhasTurmas.length === 0 ? '<p class="text-gray-500">Você não está vinculado a nenhuma turma.</p>' : ''}
                         </div>
                     `;
-                } else {
+                } 
+                // DASHBOARD ADMIN
+                else {
                     const turmas = await this.getCollection('turmas');
                     const users = await this.getCollection('users');
                     const alunosCount = users.filter(u => u.tipo === 'aluno').length;
                     const profsCount = users.filter(u => u.tipo === 'professor').length;
-                    
-                    let turmasExibir = turmas;
-                    if (this.currentUserData.tipo === 'professor') {
-                        turmasExibir = turmas.filter(t => t.professores && t.professores.includes(this.currentUserData.id));
-                    }
 
                     container.innerHTML = `
                          <div class="mb-6">
                             <h2 class="text-2xl font-bold text-gray-800">Painel de Controle</h2>
-                            <p class="text-gray-600">Visão geral do sistema.</p>
+                            <p class="text-gray-600">Visão geral administrativa.</p>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                                 <h3 class="text-gray-500 text-sm font-medium">Turmas Ativas</h3>
-                                <p class="text-3xl font-bold text-blue-600 mt-2">${turmasExibir.length}</p>
+                                <p class="text-3xl font-bold text-blue-600 mt-2">${turmas.length}</p>
                             </div>
                             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                                 <h3 class="text-gray-500 text-sm font-medium">Total de Alunos</h3>
                                 <p class="text-3xl font-bold text-blue-600 mt-2">${alunosCount}</p>
                             </div>
-                            ${this.currentUserData.tipo === 'admin' ? `
                             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                                 <h3 class="text-gray-500 text-sm font-medium">Total de Professores</h3>
                                 <p class="text-3xl font-bold text-blue-600 mt-2">${profsCount}</p>
-                            </div>` : ''}
+                            </div>
                         </div>
                     `;
                 }
             },
 
-            // ==================== GESTÃO DE PROFESSORES (NOVO) ====================
+            // ==================== OUTRAS VIEWS (Manter Funcionalidades Anteriores) ====================
+
             async renderProfessores(container) {
                 const professores = (await this.getCollection('users')).filter(u => u.tipo === 'professor');
                 const turmas = await this.getCollection('turmas');
@@ -384,243 +472,103 @@
                     const doc = await db.collection('users').doc(id).get();
                     prof = { id: doc.id, ...doc.data() };
                 }
-
                 const content = `
                     <div class="space-y-3">
-                        ${!id ? `
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Email (Login)</label>
-                            <input type="email" id="prof-email" class="w-full px-4 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Senha Provisória</label>
-                            <input type="password" id="prof-pass" class="w-full px-4 py-2 border rounded-lg">
-                        </div>` : ''}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-                            <input type="text" id="prof-nome" value="${prof ? prof.nome : ''}" class="w-full px-4 py-2 border rounded-lg">
-                        </div>
-                        <p class="text-xs text-gray-500 bg-yellow-50 p-2 rounded">
-                            <i class="fas fa-info-circle"></i> O vínculo com as turmas é feito na tela de edição da Turma.
-                        </p>
+                        ${!id ? `<div><label class="block text-sm font-medium mb-1">Email</label><input type="email" id="prof-email" class="w-full px-4 py-2 border rounded-lg"></div>
+                        <div><label class="block text-sm font-medium mb-1">Senha</label><input type="password" id="prof-pass" class="w-full px-4 py-2 border rounded-lg"></div>` : ''}
+                        <div><label class="block text-sm font-medium mb-1">Nome</label><input type="text" id="prof-nome" value="${prof ? prof.nome : ''}" class="w-full px-4 py-2 border rounded-lg"></div>
+                        <p class="text-xs text-gray-500 bg-yellow-50 p-2 rounded">Vínculo com turmas é feito na edição da Turma.</p>
                     </div>
                 `;
-
                 this.showModal(id ? 'Editar Professor' : 'Novo Professor', content, async () => {
                     const nome = document.getElementById('prof-nome').value;
-                    
                     if (!id) {
                         const email = document.getElementById('prof-email').value;
                         const pass = document.getElementById('prof-pass').value;
-                        if (!email || !pass || !nome) return alert('Preencha todos os campos');
-                        
-                        // Simulação de criação de usuário (Auth real requereria outra API ou logout)
+                        if (!email || !pass || !nome) return alert('Preencha tudo');
                         const uid = db.collection('users').doc().id;
-                        await db.collection('users').doc(uid).set({
-                            nome, email, tipo: 'professor', criado: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        alert('Usuário criado no banco. Para login real, seria necessário criar no Auth (limitação desta demo sem backend NodeJS).');
-                    } else {
-                        await db.collection('users').doc(id).update({ nome });
-                    }
+                        await db.collection('users').doc(uid).set({ nome, email, tipo: 'professor', criado: firebase.firestore.FieldValue.serverTimestamp() });
+                        alert('Professor criado (Simulação: Auth requer backend real).');
+                    } else await db.collection('users').doc(id).update({ nome });
                     this.renderContent();
                 });
             },
 
-            // ==================== TURMAS ====================
             async renderTurmas(container) {
                 const turmas = await this.getCollection('turmas');
                 const professores = (await this.getCollection('users')).filter(u => u.tipo === 'professor');
-
                 container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Gerenciar Turmas</h2>
-                        <button onclick="app.modalTurma()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                            <i class="fas fa-plus mr-2"></i>Nova Turma
-                        </button>
-                    </div>
-                    
+                    <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800">Gerenciar Turmas</h2><button onclick="app.modalTurma()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800"><i class="fas fa-plus mr-2"></i>Nova Turma</button></div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         ${turmas.map(t => {
-                            const profsNomes = professores
-                                .filter(p => t.professores && t.professores.includes(p.id))
-                                .map(p => p.nome).join(', ') || 'Sem professor';
-                            return `
-                                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 relative group">
-                                    <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
-                                        <button onclick="app.modalTurma('${t.id}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i></button>
-                                        <button onclick="app.deleteItem('turmas', '${t.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
-                                    </div>
-                                    <h3 class="font-bold text-lg text-gray-900">${t.nome}</h3>
-                                    <p class="text-sm text-gray-500 mt-1"><i class="fas fa-chalkboard-teacher mr-1"></i> ${profsNomes}</p>
-                                    <p class="text-sm text-gray-500 mt-1"><i class="fas fa-users mr-1"></i> ${t.alunos?.length || 0} alunos</p>
-                                </div>
-                            `;
+                            const profsNomes = professores.filter(p => t.professores && t.professores.includes(p.id)).map(p => p.nome).join(', ');
+                            return `<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 relative group">
+                                    <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition"><button onclick="app.modalTurma('${t.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="app.deleteItem('turmas', '${t.id}')" class="text-red-500"><i class="fas fa-trash"></i></button></div>
+                                    <h3 class="font-bold text-lg">${t.nome}</h3><p class="text-sm text-gray-500 mt-1"><i class="fas fa-chalkboard-teacher mr-1"></i> ${profsNomes || 'Sem prof'}</p><p class="text-sm text-gray-500 mt-1"><i class="fas fa-users mr-1"></i> ${t.alunos?.length || 0} alunos</p>
+                                </div>`;
                         }).join('')}
-                    </div>
-                `;
+                    </div>`;
             },
 
             async modalTurma(id = null) {
                 const professores = (await this.getCollection('users')).filter(u => u.tipo === 'professor');
                 let turma = null;
-                if (id) {
-                    const doc = await db.collection('turmas').doc(id).get();
-                    turma = { id: doc.id, ...doc.data() };
-                }
-
-                const content = `
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome da Turma</label>
-                        <input type="text" id="turma-nome" value="${turma ? turma.nome : ''}" class="w-full px-4 py-2 border rounded-lg mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Professores Vinculados</label>
-                        <div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50">
-                            ${professores.map(p => `
-                                <label class="flex items-center space-x-2 p-1 hover:bg-gray-200 rounded cursor-pointer">
-                                    <input type="checkbox" class="prof-check" value="${p.id}" ${turma && turma.professores && turma.professores.includes(p.id) ? 'checked' : ''}>
-                                    <span>${p.nome}</span>
-                                </label>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-
+                if (id) { const doc = await db.collection('turmas').doc(id).get(); turma = { id: doc.id, ...doc.data() }; }
+                const content = `<div><label class="block text-sm font-medium mb-1">Nome da Turma</label><input type="text" id="turma-nome" value="${turma ? turma.nome : ''}" class="w-full px-4 py-2 border rounded-lg mb-4"><label class="block text-sm font-medium mb-1">Professores</label><div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50">${professores.map(p => `<label class="flex items-center space-x-2 p-1 hover:bg-gray-200 rounded cursor-pointer"><input type="checkbox" class="prof-check" value="${p.id}" ${turma && turma.professores && turma.professores.includes(p.id) ? 'checked' : ''}><span>${p.nome}</span></label>`).join('')}</div></div>`;
                 this.showModal(id ? 'Editar Turma' : 'Nova Turma', content, async () => {
                     const nome = document.getElementById('turma-nome').value;
                     const profIds = Array.from(document.querySelectorAll('.prof-check:checked')).map(c => c.value);
                     if (!nome) return alert('Nome obrigatório');
                     const data = { nome, professores: profIds };
-                    
                     if (id) await db.collection('turmas').doc(id).update(data);
                     else await db.collection('turmas').add({ ...data, alunos: [], criado: firebase.firestore.FieldValue.serverTimestamp() });
                     this.renderContent();
                 });
             },
 
-            // ==================== ALUNOS ====================
             async renderAlunos(container) {
                 const turmas = await this.getCollection('turmas');
                 let alunos = (await this.getCollection('users')).filter(u => u.tipo === 'aluno');
-                
                 if (this.currentUserData.tipo === 'professor') {
                     const minhasTurmasIds = turmas.filter(t => t.professores?.includes(this.currentUserData.id)).map(t => t.id);
                     alunos = alunos.filter(a => turmas.some(t => minhasTurmasIds.includes(t.id) && t.alunos && t.alunos.includes(a.id)));
                 }
-
                 container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Gerenciar Alunos</h2>
-                        <button onclick="app.modalAluno()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                            <i class="fas fa-plus mr-2"></i>Novo Aluno
-                        </button>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <table class="w-full text-left text-sm text-gray-600">
-                            <thead class="bg-gray-50 text-gray-800 border-b">
-                                <tr>
-                                    <th class="p-4">Nome</th>
-                                    <th class="p-4">Email</th>
-                                    <th class="p-4">Turmas</th>
-                                    <th class="p-4 text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${alunos.map(a => {
-                                    const turmasAluno = turmas.filter(t => t.alunos && t.alunos.includes(a.id)).map(t => t.nome).join(', ');
-                                    return `
-                                    <tr class="hover:bg-gray-50 group">
-                                        <td class="p-4 font-medium text-gray-900">${a.nome}</td>
-                                        <td class="p-4">${a.email}</td>
-                                        <td class="p-4"><span class="badge badge-blue">${turmasAluno || 'Nenhuma'}</span></td>
-                                        <td class="p-4 text-right">
-                                            <button onclick="app.modalAluno('${a.id}')" class="text-blue-600 hover:text-blue-800 mr-3"><i class="fas fa-edit"></i></button>
-                                            ${this.currentUserData.tipo === 'admin' ? `<button onclick="app.deleteUsuario('${a.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>` : ''}
-                                        </td>
-                                    </tr>`;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
+                    <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800">Gerenciar Alunos</h2><button onclick="app.modalAluno()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800"><i class="fas fa-plus mr-2"></i>Novo Aluno</button></div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><table class="w-full text-left text-sm text-gray-600"><thead class="bg-gray-50 border-b"><tr><th class="p-4">Nome</th><th class="p-4">Email</th><th class="p-4">Turmas</th><th class="p-4 text-right">Ações</th></tr></thead>
+                    <tbody class="divide-y divide-gray-100">${alunos.map(a => {
+                        const turmasAluno = turmas.filter(t => t.alunos && t.alunos.includes(a.id)).map(t => t.nome).join(', ');
+                        return `<tr class="hover:bg-gray-50 group"><td class="p-4 font-medium text-gray-900">${a.nome}</td><td class="p-4">${a.email}</td><td class="p-4"><span class="badge badge-blue">${turmasAluno || 'Nenhuma'}</span></td><td class="p-4 text-right"><button onclick="app.modalAluno('${a.id}')" class="text-blue-600 hover:text-blue-800 mr-3"><i class="fas fa-edit"></i></button>${this.currentUserData.tipo === 'admin' ? `<button onclick="app.deleteUsuario('${a.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>` : ''}</td></tr>`;
+                    }).join('')}</tbody></table></div>`;
             },
 
             async modalAluno(id = null) {
                 const turmas = await this.getCollection('turmas');
-                let aluno = null;
-                let turmasDoAluno = [];
-
-                if (id) {
-                    const doc = await db.collection('users').doc(id).get();
-                    aluno = { id: doc.id, ...doc.data() };
-                    turmasDoAluno = turmas.filter(t => t.alunos && t.alunos.includes(id)).map(t => t.id);
-                }
-
-                const content = `
-                    <div class="space-y-3">
-                        ${!id ? `
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            <input type="email" id="alu-email" class="w-full px-4 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                            <input type="password" id="alu-pass" class="w-full px-4 py-2 border rounded-lg">
-                        </div>` : ''}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-                            <input type="text" id="alu-nome" value="${aluno ? aluno.nome : ''}" class="w-full px-4 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Vincular às Turmas</label>
-                            <div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50">
-                                ${turmas.map(t => `
-                                    <label class="flex items-center space-x-2 p-1 hover:bg-gray-200 rounded cursor-pointer">
-                                        <input type="checkbox" class="turma-check" value="${t.id}" ${turmasDoAluno.includes(t.id) ? 'checked' : ''}>
-                                        <span>${t.nome}</span>
-                                    </label>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                `;
-
+                let aluno = null; let turmasDoAluno = [];
+                if (id) { const doc = await db.collection('users').doc(id).get(); aluno = { id: doc.id, ...doc.data() }; turmasDoAluno = turmas.filter(t => t.alunos && t.alunos.includes(id)).map(t => t.id); }
+                const content = `<div class="space-y-3">${!id ? `<div><label class="block text-sm font-medium mb-1">Email</label><input type="email" id="alu-email" class="w-full px-4 py-2 border rounded-lg"></div><div><label class="block text-sm font-medium mb-1">Senha</label><input type="password" id="alu-pass" class="w-full px-4 py-2 border rounded-lg"></div>` : ''}<div><label class="block text-sm font-medium mb-1">Nome</label><input type="text" id="alu-nome" value="${aluno ? aluno.nome : ''}" class="w-full px-4 py-2 border rounded-lg"></div><div><label class="block text-sm font-medium mb-1">Vincular às Turmas</label><div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-gray-50">${turmas.map(t => `<label class="flex items-center space-x-2 p-1 hover:bg-gray-200 rounded cursor-pointer"><input type="checkbox" class="turma-check" value="${t.id}" ${turmasDoAluno.includes(t.id) ? 'checked' : ''}><span>${t.nome}</span></label>`).join('')}</div></div></div>`;
                 this.showModal(id ? 'Editar Aluno' : 'Novo Aluno', content, async () => {
                     const nome = document.getElementById('alu-nome').value;
                     const novasTurmasIds = Array.from(document.querySelectorAll('.turma-check:checked')).map(c => c.value);
                     let uid = id;
-
                     if (!id) {
-                        const email = document.getElementById('alu-email').value;
-                        const pass = document.getElementById('alu-pass').value;
+                        const email = document.getElementById('alu-email').value; const pass = document.getElementById('alu-pass').value;
                         if (!email || !pass || !nome) return alert('Preencha tudo');
                         uid = db.collection('users').doc().id;
-                        await db.collection('users').doc(uid).set({
-                            nome, email, tipo: 'aluno', criado: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        alert('Aluno criado no banco. Acesso requer Auth real.');
-                    } else {
-                        await db.collection('users').doc(uid).update({ nome });
-                    }
-
-                    // Atualizar turmas
+                        await db.collection('users').doc(uid).set({ nome, email, tipo: 'aluno', criado: firebase.firestore.FieldValue.serverTimestamp() });
+                        alert('Aluno criado (Simulação).');
+                    } else await db.collection('users').doc(uid).update({ nome });
+                    
                     const todasTurmas = await this.getCollection('turmas');
-                    for (const t of todasTurmas) {
-                        if (t.alunos && t.alunos.includes(uid)) {
-                            await db.collection('turmas').doc(t.id).update({ alunos: firebase.firestore.FieldValue.arrayRemove(uid) });
-                        }
-                    }
-                    for (const tid of novasTurmasIds) {
-                        await db.collection('turmas').doc(tid).update({ alunos: firebase.firestore.FieldValue.arrayUnion(uid) });
-                    }
+                    for (const t of todasTurmas) { if (t.alunos && t.alunos.includes(uid)) await db.collection('turmas').doc(t.id).update({ alunos: firebase.firestore.FieldValue.arrayRemove(uid) }); }
+                    for (const tid of novasTurmasIds) { await db.collection('turmas').doc(tid).update({ alunos: firebase.firestore.FieldValue.arrayUnion(uid) }); }
                     this.renderContent();
                 });
             },
 
-            // ==================== MATERIAIS ====================
             async renderMateriais(container) {
                 const turmas = await this.getCollection('turmas');
                 let materiais = await this.getCollection('materiais');
-                
                 if (this.currentUserData.tipo === 'aluno') {
                     const minhasTurmas = turmas.filter(t => t.alunos?.includes(this.currentUserData.id)).map(t => t.id);
                     materiais = materiais.filter(m => minhasTurmas.includes(m.turmaId));
@@ -628,121 +576,33 @@
                      const minhasTurmas = turmas.filter(t => t.professores?.includes(this.currentUserData.id)).map(t => t.id);
                      materiais = materiais.filter(m => minhasTurmas.includes(m.turmaId) || m.professorId === this.currentUserData.id);
                 }
-
-                container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Materiais Didáticos</h2>
-                        <button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                            <i class="fas fa-plus mr-2"></i>Adicionar Material
-                        </button>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        ${materiais.map(m => {
-                            let icon = m.tipo === 'youtube' ? 'fa-youtube text-red-600' : (m.tipo === 'link' ? 'fa-link text-green-600' : 'fa-file-alt text-blue-600');
-                            const canEdit = this.currentUserData.tipo === 'admin' || 
-                                          this.currentUserData.tipo === 'professor' || 
-                                          (this.currentUserData.tipo === 'aluno' && m.professorId === this.currentUserData.id);
-
-                            return `
-                                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover relative group">
-                                    ${canEdit ? `
-                                    <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition bg-white rounded-lg shadow-sm p-1">
-                                        <button onclick="app.showAddMaterialModal('${m.id}')" class="text-blue-600 hover:text-blue-800 mx-1"><i class="fas fa-edit"></i></button>
-                                        <button onclick="app.deleteItem('materiais', '${m.id}')" class="text-red-500 hover:text-red-700 mx-1"><i class="fas fa-trash"></i></button>
-                                    </div>` : ''}
-                                    <div class="flex items-start gap-4 mb-4">
-                                        <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                            <i class="fas ${icon} text-xl"></i>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <h3 class="font-bold text-gray-900 truncate">${m.titulo}</h3>
-                                            <p class="text-xs text-gray-500 mt-1">${m.turmaNome || 'Geral'}</p>
-                                        </div>
-                                    </div>
-                                    <a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 text-blue-700 text-center rounded-lg hover:bg-blue-100 text-sm font-medium">Acessar</a>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                `;
+                container.innerHTML = `<div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800">Materiais Didáticos</h2><button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800"><i class="fas fa-plus mr-2"></i>Adicionar Material</button></div><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${materiais.map(m => {
+                    let icon = m.tipo === 'youtube' ? 'fa-youtube text-red-600' : (m.tipo === 'link' ? 'fa-link text-green-600' : 'fa-file-alt text-blue-600');
+                    const canEdit = this.currentUserData.tipo === 'admin' || this.currentUserData.tipo === 'professor' || (this.currentUserData.tipo === 'aluno' && m.professorId === this.currentUserData.id);
+                    return `<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover relative group">${canEdit ? `<div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition bg-white p-1"><button onclick="app.showAddMaterialModal('${m.id}')" class="text-blue-600 mx-1"><i class="fas fa-edit"></i></button><button onclick="app.deleteItem('materiais', '${m.id}')" class="text-red-500 mx-1"><i class="fas fa-trash"></i></button></div>` : ''}<div class="flex items-start gap-4 mb-4"><div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0"><i class="fas ${icon} text-xl"></i></div><div class="flex-1 min-w-0"><h3 class="font-bold text-gray-900 truncate">${m.titulo}</h3><p class="text-xs text-gray-500 mt-1">${m.turmaNome || 'Geral'}</p></div></div><a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 text-blue-700 text-center rounded-lg hover:bg-blue-100 text-sm font-medium">Acessar</a></div>`;
+                }).join('')}</div>`;
             },
 
             async showAddMaterialModal(editId = null) {
-                let material = null;
-                if (editId) {
-                    const doc = await db.collection('materiais').doc(editId).get();
-                    material = { id: doc.id, ...doc.data() };
-                }
-
+                let material = null; if (editId) { const doc = await db.collection('materiais').doc(editId).get(); material = { id: doc.id, ...doc.data() }; }
                 const turmas = await this.getCollection('turmas');
                 let turmasPermitidas = turmas;
-                if (this.currentUserData.tipo === 'professor') {
-                    turmasPermitidas = turmas.filter(t => t.professores?.includes(this.currentUserData.id));
-                }
-
+                if (this.currentUserData.tipo === 'professor') turmasPermitidas = turmas.filter(t => t.professores?.includes(this.currentUserData.id));
                 const options = turmasPermitidas.map(t => `<option value="${t.id}" data-nome="${t.nome}" ${material && material.turmaId === t.id ? 'selected' : ''}>${t.nome}</option>`).join('');
-
-                const content = `
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Título</label>
-                            <input type="text" id="mat-titulo" value="${material ? material.titulo : ''}" class="w-full px-4 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
-                            <select id="mat-turma" class="w-full px-4 py-2 border rounded-lg">
-                                <option value="">Selecione...</option>
-                                ${options}
-                            </select>
-                        </div>
-                        ${!editId ? `
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                            <div class="flex gap-2">
-                                <button type="button" onclick="app.toggleMatType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm">Arquivo</button>
-                                <button type="button" onclick="app.toggleMatType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm">Link</button>
-                            </div>
-                        </div>
-                        <div id="area-arquivo" class="mt-2">
-                            <input type="file" id="mat-file" class="w-full text-sm text-gray-500">
-                        </div>
-                        <div id="area-link" class="hidden mt-2">
-                            <input type="url" id="mat-url" placeholder="https://..." class="w-full px-4 py-2 border rounded-lg">
-                        </div>` : ''}
-                    </div>
-                `;
-
+                const content = `<div class="space-y-4"><div><label class="block text-sm font-medium mb-1">Título</label><input type="text" id="mat-titulo" value="${material ? material.titulo : ''}" class="w-full px-4 py-2 border rounded-lg"></div><div><label class="block text-sm font-medium mb-1">Turma</label><select id="mat-turma" class="w-full px-4 py-2 border rounded-lg"><option value="">Selecione...</option>${options}</select></div>${!editId ? `<div><label class="block text-sm font-medium mb-1">Tipo</label><div class="flex gap-2"><button type="button" onclick="app.toggleMatType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm">Arquivo</button><button type="button" onclick="app.toggleMatType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm">Link</button></div></div><div id="area-arquivo" class="mt-2"><input type="file" id="mat-file" class="w-full text-sm text-gray-500"></div><div id="area-link" class="hidden mt-2"><input type="url" id="mat-url" placeholder="https://..." class="w-full px-4 py-2 border rounded-lg"></div>` : ''}</div>`;
                 this.showModal(editId ? 'Editar Material' : 'Novo Material', content, async () => {
                     const titulo = document.getElementById('mat-titulo').value;
                     const select = document.getElementById('mat-turma');
                     const turmaId = select.value;
                     const turmaNome = select.options[select.selectedIndex]?.dataset.nome;
-
                     if (!titulo || !turmaId) throw new Error('Preencha título e turma');
-
                     const data = { titulo, turmaId, turmaNome };
-                    
-                    if (editId) {
-                        await db.collection('materiais').doc(editId).update(data);
-                    } else {
+                    if (editId) { await db.collection('materiais').doc(editId).update(data); } else {
                         const tipo = this.currentMaterialType;
                         let url = '';
-                        if (tipo === 'link') {
-                            url = document.getElementById('mat-url').value;
-                            data.tipo = url.includes('youtu') ? 'youtube' : 'link';
-                        } else {
-                            const file = document.getElementById('mat-file').files[0];
-                            if (!file) throw new Error('Selecione arquivo');
-                            const ref = storage.ref().child(`materiais/${Date.now()}_${file.name}`);
-                            await ref.put(file);
-                            url = await ref.getDownloadURL();
-                            data.tipo = file.name.split('.').pop();
-                        }
-                        data.url = url;
-                        data.professorId = this.currentUserData.id;
-                        data.professorNome = this.currentUserData.nome;
-                        data.criado = firebase.firestore.FieldValue.serverTimestamp();
+                        if (tipo === 'link') { url = document.getElementById('mat-url').value; data.tipo = url.includes('youtu') ? 'youtube' : 'link'; } 
+                        else { const file = document.getElementById('mat-file').files[0]; if (!file) throw new Error('Selecione arquivo'); const ref = storage.ref().child(`materiais/${Date.now()}_${file.name}`); await ref.put(file); url = await ref.getDownloadURL(); data.tipo = file.name.split('.').pop(); }
+                        data.url = url; data.professorId = this.currentUserData.id; data.professorNome = this.currentUserData.nome; data.criado = firebase.firestore.FieldValue.serverTimestamp();
                         await db.collection('materiais').add(data);
                     }
                     this.renderContent();
@@ -752,77 +612,72 @@
             toggleMatType(type) {
                 this.currentMaterialType = type;
                 if(type === 'arquivo') {
-                    document.getElementById('area-arquivo').classList.remove('hidden');
-                    document.getElementById('area-link').classList.add('hidden');
+                    document.getElementById('area-arquivo').classList.remove('hidden'); document.getElementById('area-link').classList.add('hidden');
                     document.getElementById('btn-arquivo').className = 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm';
                     document.getElementById('btn-link').className = 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm';
                 } else {
-                    document.getElementById('area-arquivo').classList.add('hidden');
-                    document.getElementById('area-link').classList.remove('hidden');
+                    document.getElementById('area-arquivo').classList.add('hidden'); document.getElementById('area-link').classList.remove('hidden');
                     document.getElementById('btn-link').className = 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm';
                     document.getElementById('btn-arquivo').className = 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm';
                 }
             },
 
             async renderProvas(container) {
-                const provasMock = [
-                    { id: '1', titulo: 'Matemática - Álgebra', data: '2025-02-10', status: 'agendada', nota: null },
-                    { id: '2', titulo: 'História - Rev. Industrial', data: '2025-01-20', status: 'realizada', nota: 8.5 }
-                ];
+                const users = await this.getCollection('users');
+                const provasData = await this.getProvasData(users);
+                const minhasProvas = provasData.filter(p => p.alunoId === this.currentUserData.id);
+
                 container.innerHTML = `
-                    <h2 class="text-2xl font-bold mb-6">Minhas Provas</h2>
+                    <h2 class="text-2xl font-bold mb-6">Boletim de Notas</h2>
                     <div class="space-y-4">
-                        ${provasMock.map(p => `
+                        ${minhasProvas.map(p => `
                             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
                                 <div>
-                                    <span class="badge ${p.status === 'realizada' ? 'badge-green' : 'badge-yellow'} mb-2 inline-block">${p.status}</span>
+                                    <span class="badge ${p.status === 'realizada' ? 'badge-green' : 'badge-yellow'} mb-2 inline-block">${p.status || 'Realizada'}</span>
                                     <h3 class="font-bold text-lg">${p.titulo}</h3>
-                                    <span class="text-sm text-gray-500">${p.data}</span>
+                                    <span class="text-sm text-gray-500">${p.data || 'Data não inf.'}</span>
                                 </div>
-                                ${p.status === 'realizada' ? `<div class="text-2xl font-bold text-green-600">${p.nota}</div>` : ''}
+                                <div class="text-2xl font-bold ${p.nota >= 6 ? 'text-green-600' : 'text-red-600'}">${p.nota}</div>
                             </div>
                         `).join('')}
                     </div>
                 `;
             },
 
-            // ==================== UTILS ====================
+            // ==================== HELPERS E UTILS ====================
+
+            // Simula um banco de notas para demonstração (Garante que todo aluno tenha notas para ver)
+            async getProvasData(alunosReais) {
+                // Tenta buscar 'notas' se existisse collection. Como não existe, gera mock consistente.
+                // O mock usa o ID do aluno para ser persistente durante a sessão.
+                const alunos = alunosReais.filter(u => u.tipo === 'aluno');
+                let notas = [];
+                alunos.forEach(aluno => {
+                    // Gera notas "pseudo-aleatórias" baseadas no ID do aluno para não mudar a cada refresh
+                    const seed = aluno.id.charCodeAt(0); 
+                    const n1 = ((seed % 4) + 6).toFixed(1); // Nota entre 6 e 10
+                    const n2 = ((seed % 5) + 4).toFixed(1); // Nota entre 4 e 9
+                    
+                    notas.push({ id: `p1_${aluno.id}`, alunoId: aluno.id, titulo: 'Avaliação Parcial', data: '10/02/2025', nota: n1, status: 'realizada' });
+                    notas.push({ id: `p2_${aluno.id}`, alunoId: aluno.id, titulo: 'Prova Bimestral', data: '25/02/2025', nota: n2, status: 'realizada' });
+                });
+                return notas;
+            },
+
             showModal(title, content, onConfirm) {
                 const modalId = 'modal-' + Date.now();
                 const div = document.createElement('div');
                 div.id = modalId;
                 div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 fade-in';
-                div.innerHTML = `
-                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                        <div class="p-6 border-b flex justify-between items-center">
-                            <h3 class="font-bold text-lg">${title}</h3>
-                            <button onclick="document.getElementById('${modalId}').remove()"><i class="fas fa-times"></i></button>
-                        </div>
-                        <div class="p-6">${content}</div>
-                        <div class="p-6 border-t flex justify-end gap-3">
-                            <button onclick="document.getElementById('${modalId}').remove()" class="px-4 py-2 text-gray-600">Cancelar</button>
-                            <button id="btn-conf-${modalId}" class="px-4 py-2 bg-blue-700 text-white rounded-lg">Salvar</button>
-                        </div>
-                    </div>
-                `;
+                div.innerHTML = `<div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"><div class="p-6 border-b flex justify-between items-center"><h3 class="font-bold text-lg">${title}</h3><button onclick="document.getElementById('${modalId}').remove()"><i class="fas fa-times"></i></button></div><div class="p-6">${content}</div><div class="p-6 border-t flex justify-end gap-3"><button onclick="document.getElementById('${modalId}').remove()" class="px-4 py-2 text-gray-600">Cancelar</button><button id="btn-conf-${modalId}" class="px-4 py-2 bg-blue-700 text-white rounded-lg">Salvar</button></div></div>`;
                 document.body.appendChild(div);
-                document.getElementById(`btn-conf-${modalId}`).onclick = async () => {
-                    try { await onConfirm(); document.getElementById(modalId).remove(); this.showToast('Sucesso!'); }
-                    catch(e) { alert(e.message); }
-                };
+                document.getElementById(`btn-conf-${modalId}`).onclick = async () => { try { await onConfirm(); document.getElementById(modalId).remove(); this.showToast('Sucesso!'); } catch(e) { alert(e.message); } };
             },
 
             async deleteItem(col, id) { if(confirm('Excluir?')) { await db.collection(col).doc(id).delete(); this.renderContent(); } },
             async deleteUsuario(id) { if(confirm('Remover usuário?')) { await db.collection('users').doc(id).delete(); this.renderContent(); } },
             async getCollection(name) { const s = await db.collection(name).get(); return s.docs.map(d => ({id:d.id, ...d.data()})); },
-            showToast(m) { 
-                const t = document.getElementById('toast-container');
-                const e = document.createElement('div');
-                e.className = 'bg-gray-800 text-white px-6 py-3 rounded shadow-lg mb-2 fade-in';
-                e.innerText = m;
-                t.appendChild(e);
-                setTimeout(() => e.remove(), 3000);
-            },
+            showToast(m) { const t = document.getElementById('toast-container'); const e = document.createElement('div'); e.className = 'bg-gray-800 text-white px-6 py-3 rounded shadow-lg mb-2 fade-in'; e.innerText = m; t.appendChild(e); setTimeout(() => e.remove(), 3000); },
             capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
         };
 
