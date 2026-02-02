@@ -60,7 +60,7 @@
             currentMaterialType: 'arquivo',
             tempQuestoes: [],
             provaTimer: null,
-            logoUrl: 'logo_senatedu.png', // NOME DO ARQUIVO DA NOVA LOGO
+            logoUrl: 'logo_senatedu.png', // Certifique-se que o arquivo está na pasta correta
             
             init() {
                 this.monitorAuth();
@@ -95,39 +95,65 @@
                     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-800 via-blue-600 to-blue-500 p-4">
                         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 fade-in">
                             <div class="text-center">
-                                <img src="${this.logoUrl}" class="w-48 mx-auto mb-4 rounded-lg shadow-sm object-contain" alt="Logo SENATEDU" onerror="this.src='https://via.placeholder.com/150?text=Logo+Aqui'">
-                                <h1 class="text-3xl font-bold text-gray-900 mt-2">SENATEDU</h1>
-                                <p class="text-gray-500">Sistema de Gestão Escolar</p>
+                                <img src="${this.logoUrl}" class="w-64 mx-auto mb-2 rounded-lg object-contain" alt="Logo SENATEDU" onerror="this.src='https://via.placeholder.com/200x80?text=Logo+Aqui'">
+                                <p class="text-gray-500 font-medium">Sistema de Gestão Escolar</p>
                             </div>
+                            
                             <div id="login-error" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
+                            
                             <form id="login-form" class="space-y-4">
-                                <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" id="login-email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="admin@escola.com"></div>
-                                <div><label class="block text-sm font-medium text-gray-700 mb-1">Senha</label><input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••"></div>
-                                <button type="submit" id="login-btn" class="w-full bg-blue-700 text-white py-2 rounded-lg font-semibold hover:bg-blue-800 transition"><span id="btn-text">Entrar</span></button>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input type="email" id="login-email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="admin@escola.com">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                                    <input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••">
+                                </div>
+                                <button type="submit" id="login-btn" class="w-full bg-blue-700 text-white py-2 rounded-lg font-semibold hover:bg-blue-800 transition">
+                                    <span id="btn-text">Entrar</span>
+                                </button>
                             </form>
-                            <div class="text-center text-sm"><button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">Criar conta de Administrador</button></div>
+                            <div class="text-center text-sm">
+                                <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">Criar conta de Administrador</button>
+                            </div>
                         </div>
                     </div>`;
+                
                 document.getElementById('login-form').addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const email = document.getElementById('login-email').value;
                     const password = document.getElementById('login-password').value;
                     const btnText = document.getElementById('btn-text');
+                    
                     btnText.innerHTML = '<div class="loading"></div>';
-                    try { await auth.signInWithEmailAndPassword(email, password); } 
-                    catch (err) { document.getElementById('login-error').textContent = 'Email ou senha incorretos'; document.getElementById('login-error').classList.remove('hidden'); btnText.textContent = 'Entrar'; }
+                    
+                    try {
+                        await auth.signInWithEmailAndPassword(email, password);
+                    } catch (err) {
+                        document.getElementById('login-error').textContent = 'Email ou senha incorretos';
+                        document.getElementById('login-error').classList.remove('hidden');
+                        btnText.textContent = 'Entrar';
+                    }
                 });
             },
 
             async setupFirstAdmin() {
                 const nome = prompt('Digite seu nome completo:');
-                const email = prompt('Digite seu email:');
-                const senha = prompt('Crie uma senha (min 6 chars):');
+                const email = prompt('Digite seu email (será o login):');
+                const senha = prompt('Crie uma senha (mínimo 6 caracteres):');
+                
                 if (!nome || !email || !senha) return;
+                
                 try {
                     const userCred = await auth.createUserWithEmailAndPassword(email, senha);
-                    await db.collection('users').doc(userCred.user.uid).set({ nome: nome, email: email, tipo: 'admin', criado: firebase.firestore.FieldValue.serverTimestamp() });
-                    alert('Admin criado!');
+                    await db.collection('users').doc(userCred.user.uid).set({
+                        nome: nome,
+                        email: email,
+                        tipo: 'admin',
+                        criado: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    alert('Administrador criado com sucesso!');
                 } catch (err) { alert('Erro: ' + err.message); }
             },
 
@@ -138,28 +164,43 @@
                     <div class="min-h-screen flex flex-col md:flex-row">
                         <aside id="sidebar" class="bg-slate-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block">
                             <div class="p-6 border-b border-slate-800">
-                                <div class="flex items-center space-x-3">
-                                    <img src="${this.logoUrl}" class="w-10 h-10 rounded bg-white object-contain p-1" alt="Logo" onerror="this.style.display='none'">
-                                    <div><h1 class="text-xl font-bold">SENATEDU</h1><p class="text-xs text-slate-400">${this.capitalize(this.currentUserData.tipo)}</p></div>
+                                <div class="flex flex-col items-center justify-center space-y-2">
+                                    <div class="bg-white p-2 rounded-lg w-full flex justify-center">
+                                        <img src="${this.logoUrl}" class="h-12 w-auto object-contain" alt="Logo" onerror="this.style.display='none'">
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-2 font-mono uppercase tracking-wider border border-slate-700 px-2 py-0.5 rounded">${this.capitalize(this.currentUserData.tipo)}</p>
                                 </div>
                             </div>
                             <nav class="p-4 space-y-2" id="sidebar-nav"></nav>
                             <div class="absolute bottom-0 w-full p-4 border-t border-slate-800 bg-slate-900">
-                                <button onclick="app.logout()" class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition text-sm"><i class="fas fa-sign-out-alt"></i> <span>Sair</span></button>
+                                <div class="flex items-center space-x-3 mb-3">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold">
+                                        ${this.currentUserData.nome.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium truncate">${this.currentUserData.nome}</p>
+                                        <p class="text-xs text-slate-400 truncate">${this.currentUserData.email}</p>
+                                    </div>
+                                </div>
+                                <button onclick="app.logout()" class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition text-sm">
+                                    <i class="fas fa-sign-out-alt"></i> <span>Sair</span>
+                                </button>
                             </div>
                         </aside>
+
                         <main class="flex-1 md:ml-64 min-h-screen">
                             <div class="md:hidden bg-white shadow-sm p-4 flex items-center justify-between sticky top-0 z-10">
-                                <button onclick="document.getElementById('sidebar').classList.toggle('hidden')" class="text-gray-600"><i class="fas fa-bars text-xl"></i></button>
-                                <div class="flex items-center gap-2">
-                                    <img src="${this.logoUrl}" class="h-8 w-8 rounded bg-white object-contain" alt="Logo">
-                                    <span class="font-semibold text-blue-800">SENATEDU</span>
-                                </div>
+                                <button onclick="document.getElementById('sidebar').classList.toggle('hidden')" class="text-gray-600">
+                                    <i class="fas fa-bars text-xl"></i>
+                                </button>
+                                <img src="${this.logoUrl}" class="h-10 w-auto object-contain" alt="Logo">
                                 <div class="w-8"></div>
                             </div>
                             <div id="content-area" class="p-4 md:p-8 fade-in"></div>
                         </main>
-                    </div>`;
+                    </div>
+                `;
+
                 this.renderSidebar();
                 this.renderContent();
             },
@@ -167,6 +208,7 @@
             renderSidebar() {
                 const nav = document.getElementById('sidebar-nav');
                 const type = this.currentUserData.tipo;
+                
                 const menus = {
                     admin: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
@@ -188,10 +230,15 @@
                         { id: 'provas', icon: 'fa-file-signature', label: 'Provas' }
                     ]
                 };
-                nav.innerHTML = (menus[type] || []).map(item => `
-                    <button onclick="app.navigate('${item.id}')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition ${this.currentView === item.id ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}">
-                        <i class="fas ${item.icon} w-5"></i><span>${item.label}</span>
-                    </button>`).join('');
+
+                const items = menus[type] || [];
+                nav.innerHTML = items.map(item => `
+                    <button onclick="app.navigate('${item.id}')" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition ${this.currentView === item.id ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}">
+                        <i class="fas ${item.icon} w-5"></i>
+                        <span>${item.label}</span>
+                    </button>
+                `).join('');
             },
 
             navigate(view) {
@@ -206,7 +253,6 @@
                 content.innerHTML = '<div class="flex justify-center mt-10"><div class="loading border-blue-600 border-t-transparent w-10 h-10 border-4"></div></div>';
                 
                 try {
-                    // Roteamento
                     if (this.currentView === 'dashboard') await this.renderDashboard(content);
                     else if (this.currentView === 'materiais') await this.renderMateriais(content);
                     else if (this.currentView === 'provas') await this.renderProvas(content);
