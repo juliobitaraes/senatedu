@@ -60,6 +60,7 @@
             currentUser: null,
             currentUserData: null,
             currentView: 'dashboard',
+            currentMaterialType: 'arquivo', // Padrão
             tempQuestoes: [],
             provaTimer: null,
             isDarkMode: localStorage.getItem('theme') === 'dark',
@@ -93,7 +94,7 @@
                             if (doc.exists) {
                                 this.currentUser = user;
                                 this.currentUserData = { id: user.uid, ...doc.data() };
-                                this.currentView = 'dashboard'; // Força Dashboard ao logar
+                                this.currentView = 'dashboard';
                                 this.renderMainLayout();
                             } else {
                                 auth.signOut();
@@ -227,8 +228,6 @@
             renderSidebar() {
                 const nav = document.getElementById('sidebar-nav');
                 const type = this.currentUserData.tipo;
-                
-                // Dashboard é sempre o primeiro para todos
                 const menus = {
                     admin: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
@@ -288,14 +287,12 @@
 
             // ==================== DASHBOARD ====================
             async renderDashboard(container) {
-                // Lógica unificada: Todos veem o dashboard
                 const turmas = await this.getCollection('turmas');
                 let minhasTurmas = turmas;
 
                 if(this.currentUserData.tipo === 'professor') {
                      minhasTurmas = turmas.filter(t => t.professores && t.professores.includes(this.currentUserData.id));
                 } else if (this.currentUserData.tipo === 'aluno') {
-                    // Para o aluno, mostramos apenas as turmas onde ele está matriculado
                     minhasTurmas = turmas.filter(t => t.alunos && t.alunos.includes(this.currentUserData.id));
                 }
 
@@ -316,7 +313,6 @@
                 const turmaDoc = await db.collection('turmas').doc(turmaId).get();
                 const alunosIds = turmaDoc.data()?.alunos || [];
                 
-                // Se for aluno, mostra apenas ele mesmo na tabela para privacidade
                 let alunosDaTurma = alunos.filter(a => alunosIds.includes(a.id));
                 if (this.currentUserData.tipo === 'aluno') {
                     alunosDaTurma = alunosDaTurma.filter(a => a.id === this.currentUserData.id);
@@ -346,7 +342,6 @@
                                             const res = resultados.find(r => r.provaId === p.id && r.alunoId === aluno.id);
                                             if(!res) return `<td class="p-3 text-center text-gray-300 dark:text-gray-600">-</td>`;
                                             const nota = parseFloat(res.nota);
-                                            // Nota 0-10: Verde >= 6.0
                                             const color = nota >= 6.0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
                                             return `<td class="p-3 text-center font-bold ${color}">${nota.toFixed(1)}</td>`;
                                         }).join('')}
@@ -363,6 +358,158 @@
                     </div>` : ''}
                 `;
                 document.getElementById(`dash-turma-${turmaId}`).innerHTML = html;
+            },
+
+            // ==================== MATERIAIS ====================
+            async renderMateriais(container) {
+                const turmas = await this.getCollection('turmas');
+                let materiais = await this.getCollection('materiais');
+                
+                if (this.currentUserData.tipo === 'aluno') {
+                    const minhasTurmas = turmas.filter(t => t.alunos?.includes(this.currentUserData.id)).map(t => t.id);
+                    materiais = materiais.filter(m => minhasTurmas.includes(m.turmaId));
+                } else if (this.currentUserData.tipo === 'professor') {
+                     const minhasTurmas = turmas.filter(t => t.professores?.includes(this.currentUserData.id)).map(t => t.id);
+                     materiais = materiais.filter(m => minhasTurmas.includes(m.turmaId) || m.professorId === this.currentUserData.id);
+                }
+
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Materiais Didáticos</h2>
+                        ${this.currentUserData.tipo !== 'aluno' ? 
+                        `<button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 shadow-sm">
+                            <i class="fas fa-plus mr-2"></i>Adicionar Material
+                        </button>` : ''}
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${materiais.map(m => {
+                            let icon = this.getMaterialIcon(m.tipo);
+                            const canEdit = this.currentUserData.tipo === 'admin' || this.currentUserData.tipo === 'professor' || (this.currentUserData.tipo === 'aluno' && m.professorId === this.currentUserData.id);
+                            return `<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-slate-700 card-hover relative group">
+                                ${canEdit ? `<div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition bg-white dark:bg-slate-700 p-1 rounded border dark:border-slate-600"><button onclick="app.deleteItem('materiais', '${m.id}')" class="text-red-500 dark:text-red-400 mx-1"><i class="fas fa-trash"></i></button></div>` : ''}
+                                <div class="flex items-start gap-4 mb-4">
+                                    <div class="w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas ${icon} text-xl"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="font-bold text-gray-900 dark:text-white truncate" title="${m.titulo}">${m.titulo}</h3>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${m.turmaNome || 'Geral'} • <span class="uppercase">${m.tipo}</span></p>
+                                    </div>
+                                </div>
+                                <a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 text-center rounded-lg hover:bg-blue-100 dark:hover:bg-slate-600 text-sm font-medium">Acessar</a>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                `;
+            },
+
+            getMaterialIcon(tipo) {
+                if (tipo === 'pdf') return 'fa-file-pdf text-red-500';
+                if (tipo === 'pptx' || tipo.includes('ppt')) return 'fa-file-powerpoint text-orange-500';
+                if (tipo === 'xlsx' || tipo.includes('xls')) return 'fa-file-excel text-green-600';
+                if (tipo === 'docx' || tipo.includes('doc')) return 'fa-file-word text-blue-600';
+                if (tipo === 'youtube') return 'fa-youtube text-red-600';
+                return 'fa-link text-blue-500';
+            },
+
+            async showAddMaterialModal(editId = null) {
+                const turmas = await this.getCollection('turmas');
+                let turmasPermitidas = turmas;
+                if (this.currentUserData.tipo === 'professor') turmasPermitidas = turmas.filter(t => t.professores?.includes(this.currentUserData.id));
+                const options = turmasPermitidas.map(t => `<option value="${t.id}" data-nome="${t.nome}">${t.nome}</option>`).join('');
+                
+                const content = `
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Título</label>
+                            <input type="text" id="mat-titulo" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Turma</label>
+                            <select id="mat-turma" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                                <option value="">Selecione...</option>${options}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Tipo de Material</label>
+                            <div class="flex gap-2 mb-2">
+                                <button type="button" onclick="app.toggleMatType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold dark:bg-slate-700 dark:text-white">Arquivo (PDF, PPT, XLS)</button>
+                                <button type="button" onclick="app.toggleMatType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm dark:border-slate-600 dark:text-gray-400">Link / Youtube</button>
+                            </div>
+                        </div>
+                        <div id="area-arquivo" class="p-4 border-2 border-dashed border-gray-300 rounded-lg dark:border-slate-600">
+                            <input type="file" id="mat-file" accept=".pdf, .pptx, .ppt, .xlsx, .xls, .docx, .doc" class="w-full text-sm text-gray-500 dark:text-gray-400">
+                            <p class="text-xs text-gray-400 mt-2">Suporta: PDF, Excel, PowerPoint, Word.</p>
+                        </div>
+                        <div id="area-link" class="hidden">
+                            <input type="url" id="mat-url" placeholder="https://..." class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                        </div>
+                    </div>`;
+                
+                this.currentMaterialType = 'arquivo'; // Reset
+                
+                this.showModal('Novo Material', content, async () => {
+                    const titulo = document.getElementById('mat-titulo').value;
+                    const select = document.getElementById('mat-turma');
+                    const turmaId = select.value;
+                    const turmaNome = select.options[select.selectedIndex]?.dataset.nome;
+                    
+                    if (!titulo || !turmaId) throw new Error('Preencha título e turma.');
+                    
+                    let url = '';
+                    let tipo = 'link';
+
+                    if (this.currentMaterialType === 'arquivo') {
+                        const file = document.getElementById('mat-file').files[0];
+                        if (!file) throw new Error('Selecione um arquivo.');
+                        
+                        const ref = storage.ref().child(`materiais/${Date.now()}_${file.name}`);
+                        await ref.put(file);
+                        url = await ref.getDownloadURL();
+                        
+                        // Detectar tipo
+                        const ext = file.name.split('.').pop().toLowerCase();
+                        if(ext === 'pdf') tipo = 'pdf';
+                        else if(['ppt','pptx'].includes(ext)) tipo = 'pptx';
+                        else if(['xls','xlsx'].includes(ext)) tipo = 'xlsx';
+                        else if(['doc','docx'].includes(ext)) tipo = 'docx';
+                        else tipo = 'arquivo';
+                    
+                    } else {
+                        url = document.getElementById('mat-url').value;
+                        if (!url) throw new Error('Cole a URL.');
+                        tipo = url.includes('youtu') ? 'youtube' : 'link';
+                    }
+
+                    await db.collection('materiais').add({
+                        titulo, turmaId, turmaNome, url, tipo,
+                        professorId: this.currentUserData.id,
+                        professorNome: this.currentUserData.nome,
+                        criado: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    this.renderContent();
+                });
+            },
+
+            toggleMatType(type) {
+                this.currentMaterialType = type;
+                const btnArq = document.getElementById('btn-arquivo');
+                const btnLink = document.getElementById('btn-link');
+                const areaArq = document.getElementById('area-arquivo');
+                const areaLink = document.getElementById('area-link');
+
+                if (type === 'arquivo') {
+                    btnArq.className = 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold dark:bg-slate-700 dark:text-white';
+                    btnLink.className = 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm dark:border-slate-600 dark:text-gray-400';
+                    areaArq.classList.remove('hidden');
+                    areaLink.classList.add('hidden');
+                } else {
+                    btnLink.className = 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold dark:bg-slate-700 dark:text-white';
+                    btnArq.className = 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm dark:border-slate-600 dark:text-gray-400';
+                    areaLink.classList.remove('hidden');
+                    areaArq.classList.add('hidden');
+                }
             },
 
             // ==================== ALUNOS & IMPORTAÇÃO ====================
@@ -480,99 +627,6 @@
                     const todasTurmas = await this.getCollection('turmas');
                     for (const t of todasTurmas) { if (t.alunos && t.alunos.includes(uid)) await db.collection('turmas').doc(t.id).update({ alunos: firebase.firestore.FieldValue.arrayRemove(uid) }); }
                     for (const tid of novasTurmasIds) { await db.collection('turmas').doc(tid).update({ alunos: firebase.firestore.FieldValue.arrayUnion(uid) }); }
-                    this.renderContent();
-                });
-            },
-
-            // ==================== MATERIAIS (SÓ LINKS) ====================
-            async renderMateriais(container) {
-                const turmas = await this.getCollection('turmas');
-                let materiais = await this.getCollection('materiais');
-                
-                if (this.currentUserData.tipo === 'aluno') {
-                    const minhasTurmas = turmas.filter(t => t.alunos?.includes(this.currentUserData.id)).map(t => t.id);
-                    materiais = materiais.filter(m => minhasTurmas.includes(m.turmaId));
-                } else if (this.currentUserData.tipo === 'professor') {
-                     const minhasTurmas = turmas.filter(t => t.professores?.includes(this.currentUserData.id)).map(t => t.id);
-                     materiais = materiais.filter(m => minhasTurmas.includes(m.turmaId) || m.professorId === this.currentUserData.id);
-                }
-
-                container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Materiais Didáticos</h2>
-                        <button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 shadow-sm">
-                            <i class="fas fa-plus mr-2"></i>Adicionar Material
-                        </button>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        ${materiais.map(m => {
-                            let icon = m.tipo === 'youtube' ? 'fa-youtube text-red-600' : 'fa-link text-blue-600';
-                            const canEdit = this.currentUserData.tipo === 'admin' || this.currentUserData.tipo === 'professor' || (this.currentUserData.tipo === 'aluno' && m.professorId === this.currentUserData.id);
-                            return `<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-slate-700 card-hover relative group">
-                                ${canEdit ? `<div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition bg-white dark:bg-slate-700 p-1 rounded border dark:border-slate-600"><button onclick="app.showAddMaterialModal('${m.id}')" class="text-blue-600 dark:text-blue-400 mx-1"><i class="fas fa-edit"></i></button><button onclick="app.deleteItem('materiais', '${m.id}')" class="text-red-500 dark:text-red-400 mx-1"><i class="fas fa-trash"></i></button></div>` : ''}
-                                <div class="flex items-start gap-4 mb-4">
-                                    <div class="w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <i class="fas ${icon} text-xl"></i>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <h3 class="font-bold text-gray-900 dark:text-white truncate">${m.titulo}</h3>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${m.turmaNome || 'Geral'}</p>
-                                    </div>
-                                </div>
-                                <a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 text-center rounded-lg hover:bg-blue-100 dark:hover:bg-slate-600 text-sm font-medium">Acessar</a>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                `;
-            },
-
-            async showAddMaterialModal(editId = null) {
-                let material = null; if (editId) { const doc = await db.collection('materiais').doc(editId).get(); material = { id: doc.id, ...doc.data() }; }
-                const turmas = await this.getCollection('turmas');
-                let turmasPermitidas = turmas;
-                if (this.currentUserData.tipo === 'professor') turmasPermitidas = turmas.filter(t => t.professores?.includes(this.currentUserData.id));
-                
-                const options = turmasPermitidas.map(t => `<option value="${t.id}" data-nome="${t.nome}" ${material && material.turmaId === t.id ? 'selected' : ''}>${t.nome}</option>`).join('');
-                
-                // Removido upload de arquivos, apenas Link
-                const content = `
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Título</label>
-                            <input type="text" id="mat-titulo" value="${material ? material.titulo : ''}" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Turma</label>
-                            <select id="mat-turma" class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
-                                <option value="">Selecione...</option>${options}
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Link (URL, Youtube, Drive)</label>
-                            <input type="url" id="mat-url" value="${material ? material.url : ''}" placeholder="https://..." class="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white">
-                            <p class="text-xs text-gray-400 mt-1">Cole o link do Google Drive, Youtube ou Documento.</p>
-                        </div>
-                    </div>`;
-                
-                this.showModal(editId ? 'Editar Material' : 'Novo Material', content, async () => {
-                    const titulo = document.getElementById('mat-titulo').value;
-                    const select = document.getElementById('mat-turma');
-                    const url = document.getElementById('mat-url').value;
-                    const turmaId = select.value;
-                    const turmaNome = select.options[select.selectedIndex]?.dataset.nome;
-                    
-                    if (!titulo || !turmaId || !url) throw new Error('Preencha todos os campos.');
-                    
-                    const tipo = url.includes('youtu') ? 'youtube' : 'link';
-                    const data = { titulo, turmaId, turmaNome, url, tipo };
-
-                    if (editId) { await db.collection('materiais').doc(editId).update(data); } 
-                    else {
-                        data.professorId = this.currentUserData.id; 
-                        data.professorNome = this.currentUserData.nome; 
-                        data.criado = firebase.firestore.FieldValue.serverTimestamp();
-                        await db.collection('materiais').add(data);
-                    }
                     this.renderContent();
                 });
             },
