@@ -11,6 +11,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -21,6 +22,10 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .card-hover { transition: all 0.2s; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+        .upload-area { border: 2px dashed #cbd5e1; transition: all 0.3s; cursor: pointer; }
+        .upload-area:hover { border-color: #3b82f6; background-color: #eff6ff; }
+        .progress-bar { height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #1e40af); transition: width 0.3s; }
     </style>
 </head>
 <body class="text-gray-800 antialiased">
@@ -42,11 +47,15 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        const storage = firebase.storage();
 
         const app = {
             currentUser: null,
             currentUserData: null,
             currentView: 'dashboard',
+            currentMaterialType: 'arquivo',
+            selectedFile: null,
+            uploadTask: null,
 
             init() {
                 this.renderLogin();
@@ -271,26 +280,6 @@
                             </div>
                         </div>
                     `;
-                } else if (this.currentView === 'professores') {
-                    const profs = await this.getUsersByType('professor');
-                    content.innerHTML = `
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-2xl font-bold text-gray-800">Professores</h2>
-                            <button onclick="app.addProfessor()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                                <i class="fas fa-plus mr-2"></i>Novo
-                            </button>
-                        </div>
-                        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-                            ${profs.map(p => `
-                                <div class="p-4 border-b flex justify-between items-center">
-                                    <div>
-                                        <p class="font-semibold">${p.nome}</p>
-                                        <p class="text-sm text-gray-500">${p.email}</p>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
                 } else if (this.currentView === 'materiais') {
                     await this.renderMateriais(content);
                 } else {
@@ -300,11 +289,19 @@
 
             async renderMateriais(container) {
                 const turmas = await this.getCollection('turmas');
-                const materiais = await this.getCollection('materiais');
+                let materiais = await this.getCollection('materiais');
                 
+                // Se for aluno, filtra só os da turma dele
+                if (this.currentUserData.tipo === 'aluno') {
+                    const turmaAluno = turmas.find(t => t.alunos?.includes(this.currentUserData.id));
+                    if (turmaAluno) {
+                        materiais = materiais.filter(m => m.turmaId === turmaAluno.id);
+                    }
+                }
+
                 container.innerHTML = `
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Materiais</h2>
+                        <h2 class="text-2xl font-bold text-gray-800">Materiais Didáticos</h2>
                         ${this.currentUserData.tipo === 'professor' ? `
                         <button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
                             <i class="fas fa-plus mr-2"></i>Adicionar Material
@@ -314,26 +311,53 @@
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         ${materiais.map(m => {
-                            const icon = m.tipo === 'link' ? 'fa-link' : m.tipo === 'youtube' ? 'fa-youtube' : 'fa-file';
-                            const color = m.tipo === 'youtube' ? 'text-red-600' : m.tipo === 'link' ? 'text-green-600' : 'text-blue-600';
+                            let icon, color, btnText;
+                            
+                            if (m.tipo === 'youtube') {
+                                icon = 'fa-youtube';
+                                color = 'text-red-600';
+                                btnText = 'Assistir';
+                            } else if (m.tipo === 'link') {
+                                icon = 'fa-link';
+                                color = 'text-green-600';
+                                btnText = 'Acessar Link';
+                            } else if (m.tipo === 'pdf') {
+                                icon = 'fa-file-pdf';
+                                color = 'text-red-500';
+                                btnText = 'Baixar PDF';
+                            } else if (['doc', 'docx'].includes(m.tipo)) {
+                                icon = 'fa-file-word';
+                                color = 'text-blue-600';
+                                btnText = 'Baixar Documento';
+                            } else if (['xls', 'xlsx'].includes(m.tipo)) {
+                                icon = 'fa-file-excel';
+                                color = 'text-green-600';
+                                btnText = 'Baixar Planilha';
+                            } else if (['ppt', 'pptx'].includes(m.tipo)) {
+                                icon = 'fa-file-powerpoint';
+                                color = 'text-orange-500';
+                                btnText = 'Baixar Apresentação';
+                            } else {
+                                icon = 'fa-file';
+                                color = 'text-gray-600';
+                                btnText = 'Baixar Arquivo';
+                            }
                             
                             return `
                                 <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
-                                    <div class="flex items-start gap-4">
+                                    <div class="flex items-start gap-4 mb-4">
                                         <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                                             <i class="fas ${icon} ${color} text-xl"></i>
                                         </div>
                                         <div class="flex-1 min-w-0">
-                                            <h3 class="font-bold text-gray-900 truncate">${m.titulo}</h3>
+                                            <h3 class="font-bold text-gray-900 truncate" title="${m.titulo}">${m.titulo}</h3>
                                             <p class="text-xs text-gray-500 mt-1">${m.turmaNome || 'Geral'}</p>
                                             <p class="text-xs text-gray-400">${m.tipo.toUpperCase()}</p>
                                         </div>
                                     </div>
-                                    <div class="mt-4">
-                                        <a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 text-blue-700 text-center rounded-lg hover:bg-blue-100 text-sm font-medium">
-                                            <i class="fas fa-external-link-alt mr-2"></i>Acessar
-                                        </a>
-                                    </div>
+                                    <a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 text-blue-700 text-center rounded-lg hover:bg-blue-100 text-sm font-medium">
+                                        <i class="fas fa-download mr-2"></i>${btnText}
+                                    </a>
                                 </div>
                             `;
                         }).join('')}
@@ -346,55 +370,79 @@
             showAddMaterialModal() {
                 const div = document.createElement('div');
                 div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+                div.id = 'modal-materiais';
                 div.innerHTML = `
                     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto">
                         <div class="p-6 border-b border-gray-200 flex justify-between items-center">
                             <h3 class="text-xl font-bold text-gray-800">Adicionar Material</h3>
-                            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                            <button onclick="document.getElementById('modal-materiais').remove()" class="text-gray-400 hover:text-gray-600">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
+                        
                         <div class="p-6 space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Título</label>
-                                <input type="text" id="mat-titulo" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nome do material">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Título *</label>
+                                <input type="text" id="mat-titulo" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: Aula de Matemática - Semana 1">
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Turma *</label>
                                 <select id="mat-turma" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                                     <option value="">Selecione a turma</option>
                                 </select>
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                                <div class="flex gap-2 mb-2">
-                                    <button type="button" onclick="app.selectMaterialType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium">Arquivo</button>
-                                    <button type="button" onclick="app.selectMaterialType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg">Link</button>
-                                    <button type="button" onclick="app.selectMaterialType('youtube')" id="btn-youtube" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg">YouTube</button>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Material</label>
+                                <div class="flex gap-2">
+                                    <button type="button" onclick="app.selectMaterialType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
+                                        <i class="fas fa-file-upload mr-1"></i>Arquivo
+                                    </button>
+                                    <button type="button" onclick="app.selectMaterialType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm">
+                                        <i class="fas fa-link mr-1"></i>Link
+                                    </button>
+                                    <button type="button" onclick="app.selectMaterialType('youtube')" id="btn-youtube" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm">
+                                        <i class="fab fa-youtube mr-1"></i>YouTube
+                                    </button>
                                 </div>
                             </div>
                             
+                            <!-- Área de Upload de Arquivo -->
                             <div id="upload-area">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Arquivo (Max 30MB)</label>
-                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 hover:bg-blue-50 transition cursor-pointer" onclick="document.getElementById('mat-file').click()">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Arquivo (Máx 30MB)</label>
+                                <div class="upload-area border-2 border-dashed rounded-lg p-6 text-center" onclick="document.getElementById('mat-file').click()">
                                     <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
                                     <p class="text-sm text-gray-600">Clique para selecionar ou arraste aqui</p>
                                     <p class="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG</p>
-                                    <input type="file" id="mat-file" class="hidden" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg" onchange="app.handleFileSelect(this)">
+                                    <input type="file" id="mat-file" class="hidden" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg" onchange="app.handleFile(this)">
                                 </div>
-                                <p id="file-name" class="text-sm text-blue-600 mt-2 hidden"></p>
+                                <div id="file-info" class="hidden mt-2 p-3 bg-blue-50 rounded-lg">
+                                    <p class="text-sm font-medium text-blue-800" id="file-name"></p>
+                                    <p class="text-xs text-blue-600" id="file-size"></p>
+                                </div>
+                                <div id="upload-progress" class="hidden mt-3">
+                                    <div class="flex justify-between text-xs text-gray-600 mb-1">
+                                        <span>Enviando...</span>
+                                        <span id="progress-text">0%</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress-bar" style="width: 0%"></div>
+                                    </div>
+                                </div>
                             </div>
                             
+                            <!-- Área de Link -->
                             <div id="link-area" class="hidden">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">URL *</label>
                                 <input type="url" id="mat-url" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://...">
+                                <p class="text-xs text-gray-500 mt-1">Cole o link do Google Drive, YouTube ou outro site</p>
                             </div>
                         </div>
+                        
                         <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
-                            <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
-                            <button onclick="app.saveMaterial()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">Salvar</button>
+                            <button onclick="document.getElementById('modal-materiais').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+                            <button onclick="app.saveMaterial()" id="btn-save" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">Salvar Material</button>
                         </div>
                     </div>
                 `;
@@ -406,19 +454,43 @@
             async loadTurmasSelect() {
                 const turmas = await this.getCollection('turmas');
                 const select = document.getElementById('mat-turma');
-                turmas.forEach(t => {
-                    const option = document.createElement('option');
-                    option.value = t.id;
-                    option.textContent = t.nome;
-                    select.appendChild(option);
-                });
+                
+                // Se for professor, filtra só as turmas dele
+                if (this.currentUserData.tipo === 'professor') {
+                    const minhasTurmas = turmas.filter(t => t.professorId === this.currentUserData.id);
+                    minhasTurmas.forEach(t => {
+                        const option = document.createElement('option');
+                        option.value = t.id;
+                        option.textContent = t.nome;
+                        option.dataset.nome = t.nome;
+                        select.appendChild(option);
+                    });
+                } else {
+                    turmas.forEach(t => {
+                        const option = document.createElement('option');
+                        option.value = t.id;
+                        option.textContent = t.nome;
+                        option.dataset.nome = t.nome;
+                        select.appendChild(option);
+                    });
+                }
             },
 
             selectMaterialType(type) {
-                document.getElementById('btn-arquivo').className = type === 'arquivo' ? 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium' : 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg';
-                document.getElementById('btn-link').className = type === 'link' ? 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium' : 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg';
-                document.getElementById('btn-youtube').className = type === 'youtube' ? 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium' : 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg';
+                this.currentMaterialType = type;
                 
+                // Atualiza botões visuais
+                const types = ['arquivo', 'link', 'youtube'];
+                types.forEach(t => {
+                    const btn = document.getElementById(`btn-${t}`);
+                    if (t === type) {
+                        btn.className = 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm';
+                    } else {
+                        btn.className = 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg text-sm';
+                    }
+                });
+                
+                // Mostra/esconde áreas
                 if (type === 'arquivo') {
                     document.getElementById('upload-area').classList.remove('hidden');
                     document.getElementById('link-area').classList.add('hidden');
@@ -427,97 +499,177 @@
                     document.getElementById('link-area').classList.remove('hidden');
                 }
                 
-                this.currentMaterialType = type;
+                // Limpa seleções anteriores
+                this.selectedFile = null;
+                if (document.getElementById('mat-file')) {
+                    document.getElementById('mat-file').value = '';
+                }
+                if (document.getElementById('file-info')) {
+                    document.getElementById('file-info').classList.add('hidden');
+                }
             },
 
-            handleFileSelect(input) {
+            handleFile(input) {
                 const file = input.files[0];
-                if (file) {
-                    if (file.size > 30 * 1024 * 1024) {
-                        alert('Arquivo muito grande! Limite: 30MB');
-                        input.value = '';
-                        return;
-                    }
-                    document.getElementById('file-name').textContent = file.name;
-                    document.getElementById('file-name').classList.remove('hidden');
-                    this.selectedFile = file;
+                if (!file) return;
+                
+                // Verifica tamanho (30MB)
+                if (file.size > 30 * 1024 * 1024) {
+                    alert('Arquivo muito grande! Limite máximo: 30MB\nSeu arquivo tem: ' + (file.size / 1024 / 1024).toFixed(2) + 'MB');
+                    input.value = '';
+                    return;
                 }
+                
+                // Verifica extensão
+                const allowedTypes = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
+                const ext = file.name.split('.').pop().toLowerCase();
+                
+                if (!allowedTypes.includes(ext)) {
+                    alert('Tipo de arquivo não permitido!\n\nPermitidos: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG, JPEG');
+                    input.value = '';
+                    return;
+                }
+                
+                this.selectedFile = file;
+                
+                // Mostra informações do arquivo
+                document.getElementById('file-name').textContent = file.name;
+                document.getElementById('file-size').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+                document.getElementById('file-info').classList.remove('hidden');
             },
 
             async saveMaterial() {
-                const titulo = document.getElementById('mat-titulo').value;
-                const turmaId = document.getElementById('mat-turma').value;
+                const titulo = document.getElementById('mat-titulo').value.trim();
                 const turmaSelect = document.getElementById('mat-turma');
-                const turmaNome = turmaSelect.options[turmaSelect.selectedIndex].text;
+                const turmaId = turmaSelect.value;
+                const turmaNome = turmaSelect.options[turmaSelect.selectedIndex]?.dataset.nome || 'Geral';
                 
                 if (!titulo || !turmaId) {
-                    alert('Preencha título e turma');
+                    alert('Preencha o título e selecione a turma!');
                     return;
                 }
-
-                let url = '';
-                let tipo = this.currentMaterialType || 'arquivo';
                 
-                if (tipo === 'arquivo') {
-                    // Simulação - já que Storage não está ativo
-                    url = '#';
-                    alert('Nota: Upload de arquivo será ativado quando configurar o Firebase Storage. Por enquanto, use a opção "Link" para compartilhar arquivos do Google Drive.');
-                    return;
-                } else {
-                    url = document.getElementById('mat-url').value;
-                    if (!url) {
-                        alert('Informe a URL');
-                        return;
-                    }
-                }
-
+                const btnSave = document.getElementById('btn-save');
+                btnSave.disabled = true;
+                btnSave.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Salvando...';
+                
                 try {
-                    await db.collection('materiais').add({
-                        titulo,
-                        turmaId,
-                        turmaNome,
-                        tipo,
-                        url,
-                        professorId: this.currentUser.uid,
-                        criado: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    let url = '';
+                    let tipo = this.currentMaterialType;
+                    let fileName = '';
                     
-                    this.showToast('Material adicionado!', 'success');
-                    document.querySelector('.fixed').remove();
+                    if (tipo === 'arquivo') {
+                        if (!this.selectedFile) {
+                            alert('Selecione um arquivo!');
+                            btnSave.disabled = false;
+                            btnSave.textContent = 'Salvar Material';
+                            return;
+                        }
+                        
+                        // Prepara o upload
+                        const ext = this.selectedFile.name.split('.').pop().toLowerCase();
+                        const timestamp = Date.now();
+                        const fileNameStorage = `materiais/${turmaId}/${timestamp}_${this.selectedFile.name}`;
+                        
+                        const fileRef = storage.ref().child(fileNameStorage);
+                        const uploadTask = fileRef.put(this.selectedFile);
+                        
+                        // Mostra progresso
+                        document.getElementById('upload-progress').classList.remove('hidden');
+                        
+                        // Monitora progresso
+                        uploadTask.on('state_changed', 
+                            (snapshot) => {
+                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                                document.getElementById('progress-bar').style.width = progress + '%';
+                                document.getElementById('progress-text').textContent = Math.round(progress) + '%';
+                            },
+                            (error) => {
+                                console.error('Erro upload:', error);
+                                alert('Erro ao enviar arquivo: ' + error.message);
+                                btnSave.disabled = false;
+                                btnSave.textContent = 'Salvar Material';
+                                document.getElementById('upload-progress').classList.add('hidden');
+                            },
+                            async () => {
+                                // Upload completo
+                                url = await uploadTask.snapshot.ref.getDownloadURL();
+                                fileName = this.selectedFile.name;
+                                
+                                // Salva no Firestore
+                                await this.saveToFirestore({
+                                    titulo,
+                                    turmaId,
+                                    turmaNome,
+                                    tipo: ext,
+                                    url,
+                                    fileName,
+                                    professorId: this.currentUserData.id,
+                                    professorNome: this.currentUserData.nome,
+                                    tamanho: this.selectedFile.size,
+                                    criado: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                            }
+                        );
+                        return; // Sai da função pois o resto é feito no callback acima
+                        
+                    } else {
+                        // Link ou YouTube
+                        url = document.getElementById('mat-url').value.trim();
+                        
+                        if (!url) {
+                            alert('Informe a URL!');
+                            btnSave.disabled = false;
+                            btnSave.textContent = 'Salvar Material';
+                            return;
+                        }
+                        
+                        // Valida URL YouTube
+                        if (tipo === 'youtube') {
+                            if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+                                alert('URL do YouTube inválida!');
+                                btnSave.disabled = false;
+                                btnSave.textContent = 'Salvar Material';
+                                return;
+                            }
+                        }
+                        
+                        await this.saveToFirestore({
+                            titulo,
+                            turmaId,
+                            turmaNome,
+                            tipo,
+                            url,
+                            professorId: this.currentUserData.id,
+                            professorNome: this.currentUserData.nome,
+                            criado: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                    
+                } catch (err) {
+                    console.error(err);
+                    alert('Erro ao salvar: ' + err.message);
+                    btnSave.disabled = false;
+                    btnSave.textContent = 'Salvar Material';
+                }
+            },
+
+            async saveToFirestore(data) {
+                try {
+                    await db.collection('materiais').add(data);
+                    this.showToast('Material adicionado com sucesso!', 'success');
+                    document.getElementById('modal-materiais').remove();
                     this.renderContent();
                 } catch (err) {
-                    alert('Erro ao salvar: ' + err.message);
+                    alert('Erro ao salvar no banco: ' + err.message);
+                    document.getElementById('btn-save').disabled = false;
+                    document.getElementById('btn-save').textContent = 'Salvar Material';
                 }
             },
 
             async getCollection(collection) {
                 const snapshot = await db.collection(collection).get();
                 return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            },
-
-            async getUsersByType(tipo) {
-                const snapshot = await db.collection('users').where('tipo', '==', tipo).get();
-                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            },
-
-            async addProfessor() {
-                const nome = prompt('Nome do professor:');
-                const email = prompt('Email:');
-                const senha = prompt('Senha (mín 6 caracteres):');
-                
-                if (nome && email && senha) {
-                    try {
-                        const cred = await auth.createUserWithEmailAndPassword(email, senha);
-                        await db.collection('users').doc(cred.user.uid).set({
-                            nome, email, tipo: 'professor',
-                            criado: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        this.showToast('Professor criado!', 'success');
-                        this.renderContent();
-                    } catch (err) {
-                        alert(err.message);
-                    }
-                }
             },
 
             showToast(message, type = 'success') {
