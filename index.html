@@ -60,7 +60,6 @@
             currentMaterialType: 'arquivo',
             tempQuestoes: [],
             provaTimer: null,
-            logoUrl: 'logo_senatedu.png', // Certifique-se que o arquivo está na pasta correta
             
             init() {
                 this.monitorAuth();
@@ -95,8 +94,11 @@
                     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-800 via-blue-600 to-blue-500 p-4">
                         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 fade-in">
                             <div class="text-center">
-                                <img src="${this.logoUrl}" class="w-64 mx-auto mb-2 rounded-lg object-contain" alt="Logo SENATEDU" onerror="this.src='https://via.placeholder.com/200x80?text=Logo+Aqui'">
-                                <p class="text-gray-500 font-medium">Sistema de Gestão Escolar</p>
+                                <div class="w-20 h-20 bg-gradient-to-br from-blue-700 to-blue-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-4">
+                                    <i class="fas fa-graduation-cap text-3xl text-white"></i>
+                                </div>
+                                <h1 class="text-3xl font-bold text-gray-900">SENATEDU</h1>
+                                <p class="text-gray-500">Sistema de Gestão Escolar</p>
                             </div>
                             
                             <div id="login-error" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
@@ -118,8 +120,9 @@
                                 <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">Criar conta de Administrador</button>
                             </div>
                         </div>
-                    </div>`;
-                
+                    </div>
+                `;
+
                 document.getElementById('login-form').addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const email = document.getElementById('login-email').value;
@@ -164,11 +167,14 @@
                     <div class="min-h-screen flex flex-col md:flex-row">
                         <aside id="sidebar" class="bg-slate-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block">
                             <div class="p-6 border-b border-slate-800">
-                                <div class="flex flex-col items-center justify-center space-y-2">
-                                    <div class="bg-white p-2 rounded-lg w-full flex justify-center">
-                                        <img src="${this.logoUrl}" class="h-12 w-auto object-contain" alt="Logo" onerror="this.style.display='none'">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-graduation-cap text-lg"></i>
                                     </div>
-                                    <p class="text-xs text-slate-400 mt-2 font-mono uppercase tracking-wider border border-slate-700 px-2 py-0.5 rounded">${this.capitalize(this.currentUserData.tipo)}</p>
+                                    <div>
+                                        <h1 class="text-xl font-bold">SENATEDU</h1>
+                                        <p class="text-xs text-slate-400">${this.capitalize(this.currentUserData.tipo)}</p>
+                                    </div>
                                 </div>
                             </div>
                             <nav class="p-4 space-y-2" id="sidebar-nav"></nav>
@@ -193,7 +199,7 @@
                                 <button onclick="document.getElementById('sidebar').classList.toggle('hidden')" class="text-gray-600">
                                     <i class="fas fa-bars text-xl"></i>
                                 </button>
-                                <img src="${this.logoUrl}" class="h-10 w-auto object-contain" alt="Logo">
+                                <span class="font-semibold text-blue-800">SENATEDU</span>
                                 <div class="w-8"></div>
                             </div>
                             <div id="content-area" class="p-4 md:p-8 fade-in"></div>
@@ -253,6 +259,7 @@
                 content.innerHTML = '<div class="flex justify-center mt-10"><div class="loading border-blue-600 border-t-transparent w-10 h-10 border-4"></div></div>';
                 
                 try {
+                    // Roteamento
                     if (this.currentView === 'dashboard') await this.renderDashboard(content);
                     else if (this.currentView === 'materiais') await this.renderMateriais(content);
                     else if (this.currentView === 'provas') await this.renderProvas(content);
@@ -316,8 +323,9 @@
                                             const res = resultados.find(r => r.provaId === p.id && r.alunoId === aluno.id);
                                             if(!res) return `<td class="p-3 text-center text-gray-300">-</td>`;
                                             const nota = parseFloat(res.nota);
-                                            const color = nota >= 60 ? 'text-green-600' : 'text-red-600';
-                                            return `<td class="p-3 text-center font-bold ${color}">${nota}</td>`;
+                                            // Escala de 0 a 10: Maior que 6.0 é verde
+                                            const color = nota >= 6.0 ? 'text-green-600' : 'text-red-600';
+                                            return `<td class="p-3 text-center font-bold ${color}">${nota.toFixed(1)}</td>`;
                                         }).join('')}
                                     </tr>`;
                                 }).join('')}
@@ -333,7 +341,7 @@
                 document.getElementById(`dash-turma-${turmaId}`).innerHTML = html;
             },
 
-            // ==================== ALUNOS ====================
+            // ==================== ALUNOS & IMPORTAÇÃO EXCEL ====================
             async renderAlunos(container) {
                 const turmas = await this.getCollection('turmas');
                 let alunos = (await this.getCollection('users')).filter(u => u.tipo === 'aluno');
@@ -346,9 +354,18 @@
                 container.innerHTML = `
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Gerenciar Alunos</h2>
-                        <button onclick="app.modalAluno()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                            <i class="fas fa-plus mr-2"></i>Novo Aluno
-                        </button>
+                        <div class="flex gap-2">
+                            ${this.currentUserData.tipo === 'admin' ? `
+                                <button onclick="app.baixarModeloAluno()" class="px-3 py-2 text-blue-600 text-sm hover:underline">Modelo CSV/Excel</button>
+                                <label class="cursor-pointer px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
+                                    <i class="fas fa-file-excel mr-2"></i> Importar Excel
+                                    <input type="file" hidden accept=".xlsx, .xls" onchange="app.importarAlunosExcel(this)">
+                                </label>
+                            ` : ''}
+                            <button onclick="app.modalAluno()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
+                                <i class="fas fa-plus mr-2"></i>Novo Aluno
+                            </button>
+                        </div>
                     </div>
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                         <table class="w-full text-left text-sm text-gray-600">
@@ -378,6 +395,45 @@
                         </table>
                     </div>
                 `;
+            },
+
+            baixarModeloAluno() {
+                const ws = XLSX.utils.json_to_sheet([{ Nome: "João Silva", Email: "joao@email.com", Senha: "123456" }]);
+                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Modelo_Alunos");
+                XLSX.writeFile(wb, "Modelo_Importacao_Alunos.xlsx");
+            },
+
+            async importarAlunosExcel(input) {
+                const file = input.files[0]; if(!file) return;
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                        
+                        let count = 0;
+                        for(const row of jsonData) {
+                            if(row.Nome && row.Email) {
+                                // Adiciona direto ao Firestore para aparecer na lista.
+                                // NOTA: Em um app real, precisaria criar no Auth via Admin SDK para eles logarem.
+                                // Aqui simulamos adicionando ao banco de dados de usuários.
+                                await db.collection('users').add({
+                                    nome: row.Nome,
+                                    email: row.Email,
+                                    tipo: 'aluno',
+                                    criado: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                count++;
+                            }
+                        }
+                        alert(`${count} alunos importados com sucesso! Nota: Para eles fazerem login real, é necessário criar as credenciais no Auth manualmente ou via backend.`);
+                        this.renderContent();
+                    } catch (err) {
+                        alert("Erro ao importar: " + err.message);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
             },
 
             async modalAluno(id = null) {
@@ -634,16 +690,19 @@
                     clearInterval(timerInterval); timerInterval = null;
                     if (questaoAtualIdx < prova.questoes.length - 1) { questaoAtualIdx++; renderQuestao(); } else {
                         let acertos = 0; prova.questoes.forEach((q, i) => { if (respostas[i] === q.correta) acertos++; });
-                        const notaFinal = (acertos / prova.questoes.length) * 100;
+                        
+                        // CÁLCULO DA NOTA DE 0 A 10
+                        const notaFinal = (acertos / prova.questoes.length) * 10;
+                        
                         await db.collection('provas_resultados').add({ 
                             provaId: prova.id, 
                             alunoId: this.currentUserData.id, 
                             respostas, 
-                            nota: notaFinal.toFixed(1),
-                            dataInicio: dataInicioReal, // Salva o inicio capturado no começo da função
+                            nota: notaFinal.toFixed(1), // Ex: "8.5"
+                            dataInicio: dataInicioReal, 
                             dataFim: firebase.firestore.FieldValue.serverTimestamp() 
                         });
-                        alert(`Nota: ${notaFinal.toFixed(1)}`); app.navigate('provas');
+                        alert(`Prova finalizada! Sua nota: ${notaFinal.toFixed(1)}`); app.navigate('provas');
                     }
                 };
                 renderQuestao();
