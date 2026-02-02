@@ -6,15 +6,11 @@
     <title>SENATEDU - Sistema de Gestão Escolar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -23,131 +19,38 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .sync-status { position: fixed; bottom: 20px; right: 20px; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 100; }
-        .sync-online { background: #10b981; color: white; }
-        .sync-offline { background: #ef4444; color: white; }
-        .timer-bar { height: 100%; background: linear-gradient(90deg, #2563eb, #1e40af); transition: width 1s linear; }
         .card-hover { transition: all 0.2s; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
-        .upload-area { border: 2px dashed #cbd5e1; transition: all 0.3s; }
-        .upload-area:hover { border-color: #3b82f6; background-color: #eff6ff; }
-        .upload-area.dragover { border-color: #2563eb; background-color: #dbeafe; }
     </style>
 </head>
 <body class="text-gray-800 antialiased">
 
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
-    <div id="sync-indicator" class="sync-status sync-online hidden">
-        <i class="fas fa-cloud"></i> <span id="sync-text">Online</span>
-    </div>
-
     <div id="app"></div>
 
-    <!-- Template: Login -->
-    <template id="login-template">
-        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-800 via-blue-600 to-blue-500 p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 fade-in">
-                <div class="text-center space-y-2">
-                    <div class="w-20 h-20 bg-gradient-to-br from-blue-700 to-blue-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-4">
-                        <i class="fas fa-graduation-cap text-3xl text-white"></i>
-                    </div>
-                    <h1 class="text-3xl font-bold text-gray-900">SENATEDU</h1>
-                    <p class="text-gray-500">Sistema de Gestão Escolar</p>
-                </div>
-                
-                <div id="login-error" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
-                
-                <form id="login-form" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input type="email" id="login-email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="email@exemplo.com">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                        <input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••">
-                    </div>
-                    <button type="submit" id="login-btn" class="w-full bg-blue-700 text-white py-2 rounded-lg font-semibold hover:bg-blue-800 transition">
-                        <span id="btn-text">Entrar</span>
-                    </button>
-                </form>
-
-                <div class="space-y-2 text-center text-sm">
-                    <p class="text-gray-500">Primeiro acesso?</p>
-                    <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">
-                        Criar conta de Administrador
-                    </button>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <template id="main-layout">
-        <div class="min-h-screen flex flex-col md:flex-row">
-            <aside id="sidebar" class="bg-slate-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block">
-                <div class="p-6 border-b border-slate-800">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-graduation-cap text-lg"></i>
-                        </div>
-                        <div>
-                            <h1 class="text-xl font-bold">SENATEDU</h1>
-                            <p class="text-xs text-slate-400" id="user-role">...</p>
-                        </div>
-                    </div>
-                </div>
-                <nav class="p-4 space-y-2" id="sidebar-nav"></nav>
-                <div class="absolute bottom-0 w-full p-4 border-t border-slate-800 bg-slate-900">
-                    <div class="flex items-center space-x-3 mb-3">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold" id="user-avatar">U</div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium truncate" id="user-name">...</p>
-                            <p class="text-xs text-slate-400 truncate" id="user-email">...</p>
-                        </div>
-                    </div>
-                    <button onclick="app.logout()" class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition text-sm">
-                        <i class="fas fa-sign-out-alt"></i> <span>Sair</span>
-                    </button>
-                </div>
-            </aside>
-
-            <main class="flex-1 md:ml-64 min-h-screen">
-                <div class="md:hidden bg-white shadow-sm p-4 flex items-center justify-between sticky top-0 z-10">
-                    <button onclick="app.toggleSidebar()" class="text-gray-600"><i class="fas fa-bars text-xl"></i></button>
-                    <span class="font-semibold text-blue-800">SENATEDU</span>
-                    <div class="w-8"></div>
-                </div>
-                <div id="content-area" class="p-4 md:p-8 fade-in"></div>
-            </main>
-        </div>
-    </template>
-
     <script>
-        // ==================== SUAS CREDENCIAIS FIREBASE ====================
+        // ==================== CONFIGURAÇÃO FIREBASE ====================
         const firebaseConfig = {
             apiKey: "AIzaSyChnKOxAQH9RqSYmvcf3zYmajg3p5LCogc",
             authDomain: "educloud-sistema.firebaseapp.com",
             projectId: "educloud-sistema",
             storageBucket: "educloud-sistema.firebasestorage.app",
             messagingSenderId: "279645366191",
-            appId: "1:279645366191:web:df6df577ccc959a4f315a"
+            appId: "1:279645366191:web:df16df577ccc959a4f315a"
         };
 
-        // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const storage = firebase.storage();
 
         const app = {
             currentUser: null,
             currentUserData: null,
             currentView: 'dashboard',
-            uploadTask: null,
 
             init() {
                 this.renderLogin();
                 this.monitorAuth();
-                this.monitorConnection();
             },
 
             monitorAuth() {
@@ -160,7 +63,6 @@
                             this.renderMainLayout();
                         } else {
                             auth.signOut();
-                            alert('Usuário autenticado mas sem perfil completo no sistema');
                         }
                     } else {
                         this.currentUser = null;
@@ -170,58 +72,59 @@
                 });
             },
 
-            monitorConnection() {
-                const indicator = document.getElementById('sync-indicator');
-                const text = document.getElementById('sync-text');
-                
-                window.addEventListener('online', () => {
-                    indicator.className = 'sync-status sync-online';
-                    text.textContent = 'Online - Sincronizado';
-                    indicator.classList.remove('hidden');
-                    setTimeout(() => indicator.classList.add('hidden'), 3000);
-                });
-                
-                window.addEventListener('offline', () => {
-                    indicator.className = 'sync-status sync-offline';
-                    text.textContent = 'Offline - Dados locais';
-                    indicator.classList.remove('hidden');
-                });
-            },
-
             renderLogin() {
-                document.getElementById('app').innerHTML = document.getElementById('login-template').innerHTML;
-                
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-800 via-blue-600 to-blue-500 p-4">
+                        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6 fade-in">
+                            <div class="text-center">
+                                <div class="w-20 h-20 bg-gradient-to-br from-blue-700 to-blue-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-4">
+                                    <i class="fas fa-graduation-cap text-3xl text-white"></i>
+                                </div>
+                                <h1 class="text-3xl font-bold text-gray-900">SENATEDU</h1>
+                                <p class="text-gray-500">Sistema de Gestão Escolar</p>
+                            </div>
+                            
+                            <div id="login-error" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
+                            
+                            <form id="login-form" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input type="email" id="login-email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="email@exemplo.com">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                                    <input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••">
+                                </div>
+                                <button type="submit" id="login-btn" class="w-full bg-blue-700 text-white py-2 rounded-lg font-semibold hover:bg-blue-800 transition">
+                                    <span id="btn-text">Entrar</span>
+                                </button>
+                            </form>
+
+                            <div class="text-center text-sm">
+                                <button onclick="app.setupFirstAdmin()" class="text-blue-600 hover:underline font-medium">
+                                    Criar conta de Administrador
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
                 document.getElementById('login-form').addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const email = document.getElementById('login-email').value;
                     const password = document.getElementById('login-password').value;
-                    const btn = document.getElementById('login-btn');
                     const btnText = document.getElementById('btn-text');
-                    const error = document.getElementById('login-error');
                     
-                    btn.disabled = true;
                     btnText.innerHTML = '<div class="loading"></div>';
                     
                     try {
                         await auth.signInWithEmailAndPassword(email, password);
                     } catch (err) {
-                        error.textContent = this.getAuthError(err.code);
-                        error.classList.remove('hidden');
-                        btn.disabled = false;
+                        document.getElementById('login-error').textContent = 'Email ou senha incorretos';
+                        document.getElementById('login-error').classList.remove('hidden');
                         btnText.textContent = 'Entrar';
                     }
                 });
-            },
-
-            getAuthError(code) {
-                const errors = {
-                    'auth/user-not-found': 'Usuário não encontrado. Verifique o email.',
-                    'auth/wrong-password': 'Senha incorreta.',
-                    'auth/invalid-email': 'Email inválido.',
-                    'auth/too-many-requests': 'Muitas tentativas. Tente mais tarde.',
-                    'auth/invalid-credential': 'Email ou senha incorretos.'
-                };
-                return errors[code] || 'Erro ao autenticar. Tente novamente.';
             },
 
             async setupFirstAdmin() {
@@ -229,11 +132,7 @@
                 const email = prompt('Digite seu email (será o login):');
                 const senha = prompt('Crie uma senha (mínimo 6 caracteres):');
                 
-                if (!nome || !email || !senha) {
-                    alert('Preencha todos os campos');
-                    return;
-                }
-                
+                if (!nome || !email || !senha) return;
                 if (senha.length < 6) {
                     alert('A senha deve ter pelo menos 6 caracteres');
                     return;
@@ -241,17 +140,15 @@
                 
                 try {
                     const userCred = await auth.createUserWithEmailAndPassword(email, senha);
-                    
                     await db.collection('users').doc(userCred.user.uid).set({
                         nome: nome,
                         email: email,
                         tipo: 'admin',
                         criado: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    
-                    alert('Administrador criado com sucesso! Você será conectado automaticamente.');
+                    alert('Administrador criado com sucesso!');
                 } catch (err) {
-                    alert('Erro ao criar admin: ' + err.message);
+                    alert('Erro: ' + err.message);
                 }
             },
 
@@ -261,15 +158,50 @@
 
             renderMainLayout() {
                 const appDiv = document.getElementById('app');
-                appDiv.innerHTML = document.getElementById('main-layout').innerHTML;
-                
-                document.getElementById('user-name').textContent = this.currentUserData.nome;
-                document.getElementById('user-email').textContent = this.currentUserData.email;
-                document.getElementById('user-avatar').textContent = this.currentUserData.nome.charAt(0).toUpperCase();
-                
-                const roles = { admin: 'Administrador', professor: 'Professor', aluno: 'Aluno' };
-                document.getElementById('user-role').textContent = roles[this.currentUserData.tipo] || 'Usuário';
-                
+                appDiv.innerHTML = `
+                    <div class="min-h-screen flex flex-col md:flex-row">
+                        <aside id="sidebar" class="bg-slate-900 text-white w-64 flex-shrink-0 fixed h-screen overflow-y-auto z-30 hidden md:block">
+                            <div class="p-6 border-b border-slate-800">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-graduation-cap text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h1 class="text-xl font-bold">SENATEDU</h1>
+                                        <p class="text-xs text-slate-400">${this.currentUserData.tipo === 'admin' ? 'Administrador' : this.currentUserData.tipo === 'professor' ? 'Professor' : 'Aluno'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <nav class="p-4 space-y-2" id="sidebar-nav"></nav>
+                            <div class="absolute bottom-0 w-full p-4 border-t border-slate-800 bg-slate-900">
+                                <div class="flex items-center space-x-3 mb-3">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold">
+                                        ${this.currentUserData.nome.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium truncate">${this.currentUserData.nome}</p>
+                                        <p class="text-xs text-slate-400 truncate">${this.currentUserData.email}</p>
+                                    </div>
+                                </div>
+                                <button onclick="app.logout()" class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition text-sm">
+                                    <i class="fas fa-sign-out-alt"></i> <span>Sair</span>
+                                </button>
+                            </div>
+                        </aside>
+
+                        <main class="flex-1 md:ml-64 min-h-screen">
+                            <div class="md:hidden bg-white shadow-sm p-4 flex items-center justify-between sticky top-0 z-10">
+                                <button onclick="document.getElementById('sidebar').classList.toggle('hidden')" class="text-gray-600">
+                                    <i class="fas fa-bars text-xl"></i>
+                                </button>
+                                <span class="font-semibold text-blue-800">SENATEDU</span>
+                                <div class="w-8"></div>
+                            </div>
+                            <div id="content-area" class="p-4 md:p-8 fade-in"></div>
+                        </main>
+                    </div>
+                `;
+
                 this.renderSidebar();
                 this.renderContent();
             },
@@ -283,22 +215,17 @@
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
                         { id: 'professores', icon: 'fa-chalkboard-teacher', label: 'Professores' },
                         { id: 'turmas', icon: 'fa-users', label: 'Turmas' },
-                        { id: 'alunos', icon: 'fa-user-graduate', label: 'Todos Alunos' },
-                        { id: 'config', icon: 'fa-cog', label: 'Configurações' }
+                        { id: 'alunos', icon: 'fa-user-graduate', label: 'Alunos' }
                     ],
                     professor: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
                         { id: 'turmas', icon: 'fa-users', label: 'Minhas Turmas' },
                         { id: 'alunos', icon: 'fa-user-graduate', label: 'Meus Alunos' },
-                        { id: 'provas', icon: 'fa-file-alt', label: 'Provas' },
-                        { id: 'materiais', icon: 'fa-book', label: 'Materiais' },
-                        { id: 'notas', icon: 'fa-star', label: 'Lançar Notas' }
+                        { id: 'materiais', icon: 'fa-book', label: 'Materiais' }
                     ],
                     aluno: [
                         { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
-                        { id: 'provas', icon: 'fa-file-alt', label: 'Provas' },
-                        { id: 'materiais', icon: 'fa-book', label: 'Materiais' },
-                        { id: 'minhas-notas', icon: 'fa-star', label: 'Minhas Notas' }
+                        { id: 'materiais', icon: 'fa-book', label: 'Materiais' }
                     ]
                 };
 
@@ -312,271 +239,299 @@
                 `).join('');
             },
 
-            toggleSidebar() {
-                const sidebar = document.getElementById('sidebar');
-                sidebar.classList.toggle('hidden');
-            },
-
             navigate(view) {
                 this.currentView = view;
                 this.renderSidebar();
                 this.renderContent();
                 if (window.innerWidth < 768) {
-                    this.toggleSidebar();
-                }
-            },
-
-            async getCollection(collection) {
-                try {
-                    const snapshot = await db.collection(collection).get();
-                    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                } catch (err) {
-                    console.error('Erro ao buscar:', err);
-                    return [];
-                }
-            },
-
-            async addDocument(collection, data) {
-                try {
-                    const docRef = await db.collection(collection).add({
-                        ...data,
-                        criado: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    return docRef.id;
-                } catch (err) {
-                    this.showToast('Erro ao salvar: ' + err.message, 'error');
-                    throw err;
-                }
-            },
-
-            async deleteDocument(collection, id) {
-                if (!confirm('Tem certeza que deseja excluir?')) return;
-                try {
-                    await db.collection(collection).doc(id).delete();
-                    this.showToast('Excluído com sucesso!', 'success');
-                    this.renderContent();
-                } catch (err) {
-                    this.showToast('Erro ao excluir', 'error');
+                    document.getElementById('sidebar').classList.add('hidden');
                 }
             },
 
             async renderContent() {
                 const content = document.getElementById('content-area');
-                content.innerHTML = '<div class="flex justify-center p-8"><div class="loading border-blue-600 border-t-transparent"></div></div>';
                 
-                try {
-                    switch(this.currentView) {
-                        case 'dashboard': await this.renderDashboard(content); break;
-                        case 'professores': await this.renderProfessores(content); break;
-                        case 'turmas': await this.renderTurmas(content); break;
-                        case 'alunos': await this.renderAlunos(content); break;
-                        case 'provas': await this.renderProvas(content); break;
-                        case 'materiais': await this.renderMateriais(content); break;
-                        case 'notas': await this.renderNotas(content); break;
-                        case 'minhas-notas': await this.renderMinhasNotas(content); break;
-                        case 'config': await this.renderConfig(content); break;
-                        default: await this.renderDashboard(content);
-                    }
-                } catch (err) {
-                    content.innerHTML = `<div class="text-red-600 text-center p-4">Erro ao carregar: ${err.message}</div>`;
-                    console.error(err);
-                }
-            },
-
-            async renderDashboard(container) {
-                try {
+                if (this.currentView === 'dashboard') {
                     const totalProf = (await db.collection('users').where('tipo', '==', 'professor').get()).size;
                     const totalAlunos = (await db.collection('users').where('tipo', '==', 'aluno').get()).size;
-                    const totalTurmas = (await db.collection('turmas').get()).size;
-                    const totalProvas = (await db.collection('provas').get()).size;
-
-                    container.innerHTML = `
+                    
+                    content.innerHTML = `
                         <div class="mb-6">
-                            <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
-                            <p class="text-gray-600">Bem-vindo ao SENATEDU</p>
+                            <h2 class="text-2xl font-bold text-gray-800">Dashboard SENATEDU</h2>
+                            <p class="text-gray-600">Resumo do sistema</p>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-chalkboard-teacher text-xl"></i></div>
-                                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                                 <h3 class="text-gray-500 text-sm font-medium">Professores</h3>
-                                <p class="text-2xl font-bold text-gray-900 mt-1">${totalProf}</p>
+                                <p class="text-3xl font-bold text-blue-600 mt-2">${totalProf}</p>
                             </div>
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-user-graduate text-xl"></i></div>
-                                </div>
+                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                                 <h3 class="text-gray-500 text-sm font-medium">Alunos</h3>
-                                <p class="text-2xl font-bold text-gray-900 mt-1">${totalAlunos}</p>
-                            </div>
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-users text-xl"></i></div>
-                                </div>
-                                <h3 class="text-gray-500 text-sm font-medium">Turmas</h3>
-                                <p class="text-2xl font-bold text-gray-900 mt-1">${totalTurmas}</p>
-                            </div>
-                            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="p-3 rounded-lg bg-blue-100 text-blue-600"><i class="fas fa-file-alt text-xl"></i></div>
-                                </div>
-                                <h3 class="text-gray-500 text-sm font-medium">Provas</h3>
-                                <p class="text-2xl font-bold text-gray-900 mt-1">${totalProvas}</p>
+                                <p class="text-3xl font-bold text-blue-600 mt-2">${totalAlunos}</p>
                             </div>
                         </div>
                     `;
-                } catch (err) {
-                    container.innerHTML = '<div class="text-red-600">Erro ao carregar estatísticas</div>';
-                }
-            },
-
-            async renderProfessores(container) {
-                if (this.currentUserData.tipo !== 'admin') {
-                    container.innerHTML = '<div class="text-red-600">Acesso restrito a administradores</div>';
-                    return;
-                }
-
-                const professores = await this.getCollection('users');
-                const profs = professores.filter(u => u.tipo === 'professor');
-
-                container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <div>
+                } else if (this.currentView === 'professores') {
+                    const profs = await this.getUsersByType('professor');
+                    content.innerHTML = `
+                        <div class="flex justify-between items-center mb-6">
                             <h2 class="text-2xl font-bold text-gray-800">Professores</h2>
-                            <p class="text-gray-600">Gerencie os professores da instituição</p>
+                            <button onclick="app.addProfessor()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
+                                <i class="fas fa-plus mr-2"></i>Novo
+                            </button>
                         </div>
-                        <button onclick="app.showModal('professor')" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 flex items-center gap-2">
-                            <i class="fas fa-plus"></i> Novo Professor
-                        </button>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-50 font-semibold text-gray-800">
-                                <tr>
-                                    <th class="px-6 py-3">Nome</th>
-                                    <th class="px-6 py-3">Email</th>
-                                    <th class="px-6 py-3 text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                ${profs.map(p => `
-                                    <tr class="hover:bg-slate-50">
-                                        <td class="px-6 py-4 font-medium text-gray-900">${p.nome}</td>
-                                        <td class="px-6 py-4">${p.email}</td>
-                                        <td class="px-6 py-4 text-right">
-                                            <button onclick="app.deleteDocument('users', '${p.id}')" class="text-red-600 hover:text-red-800 p-2">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                        ${profs.length === 0 ? '<p class="p-6 text-center text-gray-500">Nenhum professor cadastrado</p>' : ''}
-                    </div>
-                `;
+                        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                            ${profs.map(p => `
+                                <div class="p-4 border-b flex justify-between items-center">
+                                    <div>
+                                        <p class="font-semibold">${p.nome}</p>
+                                        <p class="text-sm text-gray-500">${p.email}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else if (this.currentView === 'materiais') {
+                    await this.renderMateriais(content);
+                } else {
+                    content.innerHTML = '<div class="text-center text-gray-500">Funcionalidade em desenvolvimento</div>';
+                }
             },
 
-            async renderTurmas(container) {
+            async renderMateriais(container) {
                 const turmas = await this.getCollection('turmas');
-                const users = await this.getCollection('users');
+                const materiais = await this.getCollection('materiais');
                 
                 container.innerHTML = `
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Turmas</h2>
-                        ${this.currentUserData.tipo !== 'aluno' ? `
-                        <button onclick="app.showModal('turma')" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                            <i class="fas fa-plus mr-2"></i>Nova Turma
+                        <h2 class="text-2xl font-bold text-gray-800">Materiais</h2>
+                        ${this.currentUserData.tipo === 'professor' ? `
+                        <button onclick="app.showAddMaterialModal()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
+                            <i class="fas fa-plus mr-2"></i>Adicionar Material
                         </button>
                         ` : ''}
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        ${turmas.map(t => {
-                            const prof = users.find(u => u.id === t.professorId);
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${materiais.map(m => {
+                            const icon = m.tipo === 'link' ? 'fa-link' : m.tipo === 'youtube' ? 'fa-youtube' : 'fa-file';
+                            const color = m.tipo === 'youtube' ? 'text-red-600' : m.tipo === 'link' ? 'text-green-600' : 'text-blue-600';
+                            
                             return `
-                                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden card-hover">
-                                    <div class="h-32 bg-gradient-to-r from-blue-700 to-blue-500 p-6 flex justify-between items-start">
-                                        <div class="mt-4">
-                                            <h3 class="text-white text-xl font-bold">${t.nome}</h3>
-                                            <p class="text-blue-100 text-sm">${t.serie || ''} • ${t.turno || ''}</p>
+                                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 card-hover">
+                                    <div class="flex items-start gap-4">
+                                        <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                            <i class="fas ${icon} ${color} text-xl"></i>
                                         </div>
-                                        <button onclick="app.showQRCode('${t.id}')" class="bg-white bg-opacity-20 p-2 rounded-lg text-white hover:bg-opacity-30" title="QR Code">
-                                            <i class="fas fa-qrcode"></i>
-                                        </button>
+                                        <div class="flex-1 min-w-0">
+                                            <h3 class="font-bold text-gray-900 truncate">${m.titulo}</h3>
+                                            <p class="text-xs text-gray-500 mt-1">${m.turmaNome || 'Geral'}</p>
+                                            <p class="text-xs text-gray-400">${m.tipo.toUpperCase()}</p>
+                                        </div>
                                     </div>
-                                    <div class="p-6">
-                                        <p class="text-sm text-gray-600 mb-4">Professor: ${prof ? prof.nome : 'Não atribuído'}</p>
-                                        <button onclick="app.viewTurma('${t.id}')" class="w-full py-2 border border-gray-300 rounded-lg hover:bg-slate-50 text-sm font-medium">
-                                            Ver Detalhes
-                                        </button>
+                                    <div class="mt-4">
+                                        <a href="${m.url}" target="_blank" class="block w-full py-2 bg-blue-50 text-blue-700 text-center rounded-lg hover:bg-blue-100 text-sm font-medium">
+                                            <i class="fas fa-external-link-alt mr-2"></i>Acessar
+                                        </a>
                                     </div>
                                 </div>
                             `;
                         }).join('')}
                     </div>
+                    
+                    ${materiais.length === 0 ? '<p class="text-center text-gray-500 mt-8">Nenhum material cadastrado</p>' : ''}
                 `;
             },
 
-            async renderAlunos(container) {
-                const alunos = await this.getCollection('users');
-                const lista = alunos.filter(u => u.tipo === 'aluno');
-
-                container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Alunos</h2>
-                        <button onclick="app.showModal('aluno')" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                            <i class="fas fa-plus mr-2"></i>Novo Aluno
-                        </button>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th class="px-6 py-3">Nome</th>
-                                    <th class="px-6 py-3">Email</th>
-                                    <th class="px-6 py-3 text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y">
-                                ${lista.map(a => `
-                                    <tr class="hover:bg-slate-50">
-                                        <td class="px-6 py-4 font-medium">${a.nome}</td>
-                                        <td class="px-6 py-4">${a.email}</td>
-                                        <td class="px-6 py-4 text-right">
-                                            <button onclick="app.deleteDocument('users', '${a.id}')" class="text-red-600 hover:text-red-800">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+            showAddMaterialModal() {
+                const div = document.createElement('div');
+                div.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+                div.innerHTML = `
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto">
+                        <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h3 class="text-xl font-bold text-gray-800">Adicionar Material</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                                <input type="text" id="mat-titulo" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nome do material">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+                                <select id="mat-turma" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <option value="">Selecione a turma</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                                <div class="flex gap-2 mb-2">
+                                    <button type="button" onclick="app.selectMaterialType('arquivo')" id="btn-arquivo" class="flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium">Arquivo</button>
+                                    <button type="button" onclick="app.selectMaterialType('link')" id="btn-link" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg">Link</button>
+                                    <button type="button" onclick="app.selectMaterialType('youtube')" id="btn-youtube" class="flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg">YouTube</button>
+                                </div>
+                            </div>
+                            
+                            <div id="upload-area">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Arquivo (Max 30MB)</label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 hover:bg-blue-50 transition cursor-pointer" onclick="document.getElementById('mat-file').click()">
+                                    <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                    <p class="text-sm text-gray-600">Clique para selecionar ou arraste aqui</p>
+                                    <p class="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG</p>
+                                    <input type="file" id="mat-file" class="hidden" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg" onchange="app.handleFileSelect(this)">
+                                </div>
+                                <p id="file-name" class="text-sm text-blue-600 mt-2 hidden"></p>
+                            </div>
+                            
+                            <div id="link-area" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                                <input type="url" id="mat-url" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://...">
+                            </div>
+                        </div>
+                        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+                            <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+                            <button onclick="app.saveMaterial()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">Salvar</button>
+                        </div>
                     </div>
                 `;
-            },
-
-            async renderProvas(container) {
-                const provas = await this.getCollection('provas');
-                const turmas = await this.getCollection('turmas');
                 
-                let provasFiltradas = provas;
-                if (this.currentUserData.tipo === 'professor') {
-                    provasFiltradas = provas.filter(p => p.professorId === this.currentUserData.id);
-                } else if (this.currentUserData.tipo === 'aluno') {
-                    const turmaAluno = turmas.find(t => t.alunos?.includes(this.currentUserData.id));
-                    provasFiltradas = provas.filter(p => p.turmaId === turmaAluno?.id && p.ativa);
+                document.body.appendChild(div);
+                this.loadTurmasSelect();
+            },
+
+            async loadTurmasSelect() {
+                const turmas = await this.getCollection('turmas');
+                const select = document.getElementById('mat-turma');
+                turmas.forEach(t => {
+                    const option = document.createElement('option');
+                    option.value = t.id;
+                    option.textContent = t.nome;
+                    select.appendChild(option);
+                });
+            },
+
+            selectMaterialType(type) {
+                document.getElementById('btn-arquivo').className = type === 'arquivo' ? 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium' : 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg';
+                document.getElementById('btn-link').className = type === 'link' ? 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium' : 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg';
+                document.getElementById('btn-youtube').className = type === 'youtube' ? 'flex-1 py-2 border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-lg font-medium' : 'flex-1 py-2 border-2 border-gray-200 text-gray-600 rounded-lg';
+                
+                if (type === 'arquivo') {
+                    document.getElementById('upload-area').classList.remove('hidden');
+                    document.getElementById('link-area').classList.add('hidden');
+                } else {
+                    document.getElementById('upload-area').classList.add('hidden');
+                    document.getElementById('link-area').classList.remove('hidden');
+                }
+                
+                this.currentMaterialType = type;
+            },
+
+            handleFileSelect(input) {
+                const file = input.files[0];
+                if (file) {
+                    if (file.size > 30 * 1024 * 1024) {
+                        alert('Arquivo muito grande! Limite: 30MB');
+                        input.value = '';
+                        return;
+                    }
+                    document.getElementById('file-name').textContent = file.name;
+                    document.getElementById('file-name').classList.remove('hidden');
+                    this.selectedFile = file;
+                }
+            },
+
+            async saveMaterial() {
+                const titulo = document.getElementById('mat-titulo').value;
+                const turmaId = document.getElementById('mat-turma').value;
+                const turmaSelect = document.getElementById('mat-turma');
+                const turmaNome = turmaSelect.options[turmaSelect.selectedIndex].text;
+                
+                if (!titulo || !turmaId) {
+                    alert('Preencha título e turma');
+                    return;
                 }
 
-                container.innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Provas</h2>
-                        ${this.currentUserData.tipo === 'professor' ? `
-                        <button onclick="app.showModal('prova')" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800">
-                            <i class="fas fa-plus mr-2"></i>Criar Prova
-                        </button>
-                        ` : ''}
-                    </div>
-                    <div class="grid grid-cols-1 gap-4">
-                        ${provasFiltradas.map(p => {
-                            const turma = turmas.find
+                let url = '';
+                let tipo = this.currentMaterialType || 'arquivo';
+                
+                if (tipo === 'arquivo') {
+                    // Simulação - já que Storage não está ativo
+                    url = '#';
+                    alert('Nota: Upload de arquivo será ativado quando configurar o Firebase Storage. Por enquanto, use a opção "Link" para compartilhar arquivos do Google Drive.');
+                    return;
+                } else {
+                    url = document.getElementById('mat-url').value;
+                    if (!url) {
+                        alert('Informe a URL');
+                        return;
+                    }
+                }
+
+                try {
+                    await db.collection('materiais').add({
+                        titulo,
+                        turmaId,
+                        turmaNome,
+                        tipo,
+                        url,
+                        professorId: this.currentUser.uid,
+                        criado: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    this.showToast('Material adicionado!', 'success');
+                    document.querySelector('.fixed').remove();
+                    this.renderContent();
+                } catch (err) {
+                    alert('Erro ao salvar: ' + err.message);
+                }
+            },
+
+            async getCollection(collection) {
+                const snapshot = await db.collection(collection).get();
+                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            },
+
+            async getUsersByType(tipo) {
+                const snapshot = await db.collection('users').where('tipo', '==', tipo).get();
+                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            },
+
+            async addProfessor() {
+                const nome = prompt('Nome do professor:');
+                const email = prompt('Email:');
+                const senha = prompt('Senha (mín 6 caracteres):');
+                
+                if (nome && email && senha) {
+                    try {
+                        const cred = await auth.createUserWithEmailAndPassword(email, senha);
+                        await db.collection('users').doc(cred.user.uid).set({
+                            nome, email, tipo: 'professor',
+                            criado: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        this.showToast('Professor criado!', 'success');
+                        this.renderContent();
+                    } catch (err) {
+                        alert(err.message);
+                    }
+                }
+            },
+
+            showToast(message, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                const color = type === 'success' ? 'bg-blue-600' : 'bg-red-500';
+                toast.className = `${color} text-white px-6 py-3 rounded-lg shadow-lg mb-2 fade-in`;
+                toast.textContent = message;
+                container.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+        };
+
+        app.init();
+    </script>
+</body>
+</html>
